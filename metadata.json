@@ -1,0 +1,6 @@
+{
+  "name": "ViSky Weather",
+  "description": "A visually stunning glassmorphic weather application featuring 3D claymorphism aesthetics and real-time global weather data.",
+  "requestFramePermissions": ["geolocation"],
+  "majorCapabilities": []
+}
