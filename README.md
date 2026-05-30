@@ -1,20 +1,15 @@
 <div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
+  <h1>🌤️ ViSky Weather</h1>
+  <p><b>Real-time Forecasts & Global Weather News</b></p>
 </div>
 
-# Run and deploy your AI Studio app
+---
 
-This contains everything you need to run your app locally.
+## 🌍 About The Project
 
-View your app in AI Studio: https://ai.studio/apps/74408e36-1a2d-43ee-b814-dbf91769517b
+**ViSky Weather** is an AI-assisted web application that lets you check the current weather and latest weather-related news for any location across the globe. Whether you are planning a trip or just want to stay updated on global climates, this tool provides quick, accurate, and easy-to-read reports.
 
-## Run Locally
-
-**Prerequisites:**  Node.js
-
-
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+### ✨ Features
+* 🌡️ **Global Search:** Find real-time weather data for any city or country.
+* 📰 **Weather News:** Stay updated with the latest climate and weather headlines.
+* ⚡ **AI-Assisted Build:** Logic and structure generated rapidly using advanced AI tools.
