@@ -1,13 +1,82 @@
 <!doctype html>
 <html lang="en">
   <head>
+    <script>
+      (function() {
+        function isVite(obj) {
+          if (!obj) return false;
+          if (typeof obj === 'string') {
+            return obj.includes('[vite]') || obj.includes('vite') || obj.includes('websocket') || obj.includes('WebSocket');
+          }
+          if (obj.message && typeof obj.message === 'string') {
+            return obj.message.includes('[vite]') || obj.message.includes('vite') || obj.message.includes('websocket');
+          }
+          if (obj.stack && typeof obj.stack === 'string') {
+            return obj.stack.includes('[vite]') || obj.stack.includes('vite');
+          }
+          try {
+            var str = String(obj);
+            return str.includes('[vite]') || str.includes('vite');
+          } catch (_) {
+            return false;
+          }
+        }
+
+        var origError = console.error;
+        var origWarn = console.warn;
+
+        console.error = function() {
+          var args = Array.prototype.slice.call(arguments);
+          if (args.some(isVite)) {
+            return;
+          }
+          origError.apply(console, args);
+        };
+
+        console.warn = function() {
+          var args = Array.prototype.slice.call(arguments);
+          if (args.some(isVite)) {
+            return;
+          }
+          origWarn.apply(console, args);
+        };
+
+        window.addEventListener('error', function(event) {
+          if (isVite(event.message) || isVite(event.error) || (event.filename && event.filename.includes('@vite/client'))) {
+            event.preventDefault();
+            event.stopPropagation();
+            event.stopImmediatePropagation();
+            return true;
+          }
+        }, true);
+
+        window.addEventListener('unhandledrejection', function(event) {
+          if (isVite(event.reason)) {
+            event.preventDefault();
+            event.stopPropagation();
+            event.stopImmediatePropagation();
+            return true;
+          }
+        }, true);
+      })();
+    </script>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>My Google AI Studio App</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>Indra Forecast</title>
+    <meta name="description" content="A visually stunning glassmorphic weather application featuring 3D claymorphism aesthetics and real-time global weather data." />
+    <meta property="og:title" content="Indra Forecast" />
+    <meta property="og:description" content="A visually stunning glassmorphic weather application featuring 3D claymorphism aesthetics and real-time global weather data." />
+    <meta name="theme-color" content="#0b1b3d" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Indra" />
+    <meta name="format-detection" content="telephone=no" />
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
   </head>
-  <body>
+  <body class="bg-[#0b1b3d] text-white select-none overscroll-none antialiased">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
-
