@@ -1,1 +1,193 @@
 @import "tailwindcss";
+
+@layer base {
+  html, body {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+/* GPU-accelerated lightweight weather animations - runs 100% on GPU compositor with zero JS RAM overhead */
+@keyframes cloudDrift1 {
+  0% {
+    transform: translate3d(-320px, 0, 0);
+  }
+  100% {
+    transform: translate3d(calc(100vw + 320px), 0, 0);
+  }
+}
+
+@keyframes cloudDrift2 {
+  0% {
+    transform: translate3d(-380px, 0, 0);
+  }
+  100% {
+    transform: translate3d(calc(100vw + 380px), 0, 0);
+  }
+}
+
+@keyframes cloudDrift3 {
+  0% {
+    transform: translate3d(-280px, 0, 0);
+  }
+  100% {
+    transform: translate3d(calc(100vw + 280px), 0, 0);
+  }
+}
+
+@keyframes fogDrift1 {
+  0% {
+    transform: translate3d(-350px, 0, 0);
+  }
+  100% {
+    transform: translate3d(calc(100vw + 350px), 0, 0);
+  }
+}
+
+@keyframes fogDrift2 {
+  0% {
+    transform: translate3d(-420px, 0, 0);
+  }
+  100% {
+    transform: translate3d(calc(100vw + 420px), 0, 0);
+  }
+}
+
+@keyframes starTwinkle {
+  0%, 100% {
+    opacity: 0.2;
+    transform: scale(0.85);
+  }
+  50% {
+    opacity: 0.95;
+    transform: scale(1.35);
+  }
+}
+
+@keyframes sunPulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.85;
+  }
+  50% {
+    transform: scale(1.06);
+    opacity: 1;
+  }
+}
+
+@keyframes neonGlow {
+  0%, 100% {
+    opacity: 0.6;
+    filter: drop-shadow(0 0 15px rgba(6, 182, 212, 0.4));
+  }
+  50% {
+    opacity: 0.9;
+    filter: drop-shadow(0 0 28px rgba(168, 85, 247, 0.65));
+  }
+}
+
+@keyframes rainFall {
+  0% {
+    transform: translate3d(0, -80px, 0);
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.5;
+  }
+  85% {
+    opacity: 0.6;
+  }
+  100% {
+    transform: translate3d(0, 105vh, 0);
+    opacity: 0;
+  }
+}
+
+@keyframes snowFall {
+  0% {
+    transform: translate3d(0, -20px, 0);
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.6;
+  }
+  80% {
+    opacity: 0.6;
+  }
+  100% {
+    transform: translate3d(12px, 105vh, 0);
+    opacity: 0;
+  }
+}
+
+@keyframes cloudDriftSlow {
+  0% {
+    transform: translate3d(-35vw, 0, 0);
+  }
+  100% {
+    transform: translate3d(115vw, 0, 0);
+  }
+}
+
+@keyframes subtleFloat {
+  0%, 100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(0, -5px, 0);
+  }
+}
+
+.anim-float {
+  animation: subtleFloat 4.5s ease-in-out infinite;
+  will-change: transform;
+}
+
+/* Shimmer beam and glow transitions */
+@keyframes beamTravel {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(300%);
+  }
+}
+
+@keyframes pulseGlow {
+  0%, 100% {
+    opacity: 0.45;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.9;
+    transform: scale(1.04);
+  }
+}
+
+.anim-beam {
+  animation: beamTravel 3.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  will-change: transform;
+}
+
+.anim-pulse-glow {
+  animation: pulseGlow 3s ease-in-out infinite;
+}
+
+/* Hide scrollbars smoothly while preserving momentum scrolling */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Smooth reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

@@ -43,8 +43,10 @@ import { WeatherEffects } from "./components/WeatherEffects";
 import { PWAInstallButton } from "./components/PWAInstallButton";
 import { OfflineIndicator } from "./components/OfflineIndicator";
 import { SettingsModal } from "./components/SettingsModal";
+import { SettingsPage } from "./components/SettingsPage";
 import { MobileBottomNav } from "./components/MobileBottomNav";
 import { WeatherSimpleSummary } from "./components/WeatherSimpleSummary";
+import { AppLogo } from "./components/AppLogo";
 import { INDIAN_METROS } from "./utils/locationHelper";
 import { TRANSLATIONS, LanguageCode, TranslationStrings, AVAILABLE_LANGUAGES } from "./utils/translations";
 import {
@@ -350,13 +352,52 @@ export default function App() {
     setSearchHistory([]);
   };
 
-  const handleRefresh = () => {
-    if (!weather) return;
+  const handleRefresh = useCallback(() => {
+    if (!weather || isRefreshing) return;
     setIsRefreshing(true);
+    showToast("Refreshing weather forecast...");
     const query = weather.location.lat && weather.location.lon 
       ? `${weather.location.lat},${weather.location.lon}` 
       : weather.location.name;
     fetchWeather(query, isLiveLocation);
+  }, [weather, isRefreshing, isLiveLocation, fetchWeather]);
+
+  // Pull-to-refresh mobile thumb gesture handling
+  const [pullDistance, setPullDistance] = useState(0);
+  const [isPulling, setIsPulling] = useState(false);
+  const touchStartY = useRef<number>(0);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (window.scrollY <= 4) {
+      touchStartY.current = e.touches[0].clientY;
+      setIsPulling(true);
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!isPulling || isRefreshing) return;
+    if (window.scrollY > 4) {
+      setPullDistance(0);
+      return;
+    }
+    const currentY = e.touches[0].clientY;
+    const diff = currentY - touchStartY.current;
+    if (diff > 0) {
+      // Elastic rubber band pull resistance
+      const pull = Math.min(85, diff * 0.45);
+      setPullDistance(pull);
+    } else {
+      setPullDistance(0);
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (!isPulling) return;
+    setIsPulling(false);
+    if (pullDistance >= 55 && !isRefreshing) {
+      handleRefresh();
+    }
+    setPullDistance(0);
   };
 
   const aqiInfo = weather?.current.air_quality 
@@ -367,27 +408,63 @@ export default function App() {
 
   return (
     <div 
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
       className={`min-h-screen text-white font-sans selection:bg-amber-400 selection:text-black antialiased relative overflow-x-hidden transition-colors duration-500 ${
         isBlueSky 
-          ? "bg-[#0b1e42] bg-gradient-to-br from-[#0e2a5e] via-[#0b1e42] to-[#07132b]" 
-          : "bg-[#070e1c] bg-gradient-to-br from-[#0c162e] via-[#070e1c] to-[#040812]"
+          ? "bg-[#0e2c60] bg-gradient-to-b from-[#0e2c60] via-[#123a78] to-[#0a1f44]" 
+          : "bg-[#030612] bg-gradient-to-b from-[#030612] via-[#070e24] to-[#02040c]"
       }`}
     >
-      {/* Radiant atmospheric Blue Sky ambient lighting */}
+      {/* Pull To Refresh Native Mobile Floating Indicator */}
+      <div 
+        id="pull-to-refresh-indicator"
+        className="fixed top-14 left-0 right-0 z-50 flex justify-center pointer-events-none transition-all duration-200 ease-out"
+        style={{
+          transform: `translateY(${isRefreshing ? 14 : pullDistance > 10 ? Math.min(pullDistance, 55) : -80}px)`,
+          opacity: isRefreshing || pullDistance > 10 ? 1 : 0
+        }}
+      >
+        <div className={`border text-white rounded-full px-4 py-2 flex items-center gap-2.5 backdrop-blur-md transition-colors ${
+          isBlueSky 
+            ? "bg-[#0e2b5c]/95 border-sky-400/40 shadow-[0_10px_25px_rgba(0,0,0,0.5)]" 
+            : "bg-[#070e22]/95 border-slate-600/50 shadow-[0_0_20px_rgba(0,0,0,0.7)]"
+        }`}>
+          <RefreshCw 
+            className={`w-4 h-4 text-amber-400 transition-all ${
+              isRefreshing 
+                ? 'animate-spin' 
+                : pullDistance >= 55 
+                ? 'text-emerald-400' 
+                : ''
+            }`}
+            style={!isRefreshing ? { transform: `rotate(${Math.min(180, (pullDistance / 55) * 180)}deg)` } : undefined}
+          />
+          <span className="text-xs font-semibold text-sky-100">
+            {isRefreshing 
+              ? 'Refreshing weather...' 
+              : pullDistance >= 55 
+              ? 'Release to refresh' 
+              : 'Pull down to refresh'}
+          </span>
+        </div>
+      </div>
+      {/* Radiant atmospheric Day / Night ambient lighting (Soft & Eye-friendly) */}
       <div 
         className={`fixed inset-0 pointer-events-none -z-10 transition-opacity duration-700 ${
           isBlueSky
-            ? "bg-[radial-gradient(ellipse_120%_80%_at_50%_-10%,rgba(14,165,233,0.38)_0%,rgba(37,99,235,0.25)_35%,rgba(11,30,66,1)_90%)]"
-            : "bg-[radial-gradient(ellipse_100%_70%_at_50%_0%,rgba(30,58,138,0.28)_0%,rgba(7,14,28,1)_85%)]"
+            ? "bg-[radial-gradient(ellipse_100%_60%_at_50%_-10%,rgba(56,189,248,0.18)_0%,rgba(37,99,235,0.1)_45%,transparent_80%)]"
+            : "bg-[radial-gradient(ellipse_100%_60%_at_50%_0%,rgba(99,102,241,0.12)_0%,rgba(30,58,138,0.06)_50%,transparent_80%)]"
         }`} 
       />
 
-      {/* Subtle Sun Corona Flare */}
+      {/* Subtle Sun Corona Flare in Day Mode (Soft, non-blinding) */}
       {isBlueSky && (
-        <div className="fixed -top-24 left-1/2 -translate-x-1/2 w-[600px] h-[350px] bg-gradient-to-b from-sky-400/25 via-amber-300/10 to-transparent blur-3xl pointer-events-none -z-10" />
+        <div className="fixed -top-24 left-1/2 -translate-x-1/2 w-[500px] h-[280px] bg-gradient-to-b from-amber-200/12 via-sky-300/8 to-transparent blur-3xl pointer-events-none -z-10" />
       )}
       
-      {weather && <WeatherEffects condition={weather.current.condition.text} />}
+      <WeatherEffects condition={weather?.current.condition.text || 'clear'} isNight={!isBlueSky} />
       <OfflineIndicator />
 
       {/* Floating Status Toast */}
@@ -397,7 +474,7 @@ export default function App() {
             initial={{ opacity: 0, y: -20, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -20, scale: 0.95 }}
-            className="fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-2xl bg-[#0e244d]/95 border border-sky-400/30 text-white text-xs font-medium shadow-2xl backdrop-blur-2xl flex items-center gap-2"
+            className="fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-2xl bg-[#0e244d]/95 border border-sky-400/30 text-white text-xs font-medium shadow-2xl backdrop-blur-md flex items-center gap-2"
           >
             <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
             <span>{toastMessage}</span>
@@ -406,27 +483,43 @@ export default function App() {
       </AnimatePresence>
 
       {/* Top Aesthetic Header */}
-      <header className="sticky top-0 z-40 bg-[#0b1e42]/90 backdrop-blur-2xl border-b border-white/[0.12] px-4 py-3 shadow-md">
-        <div className="max-w-4xl mx-auto flex items-center justify-between gap-2.5">
-          {/* Logo / Brand - Hidden when search is focused */}
+      <header className={`sticky top-0 z-40 backdrop-blur-md px-3 sm:px-4 py-2 sm:py-3 shadow-md transition-colors ${
+        isBlueSky
+          ? "bg-[#0b244e]/95 border-b border-white/[0.12] shadow-[0_4px_20px_rgba(0,0,0,0.3)]"
+          : "bg-[#040816]/95 border-b border-white/[0.08] shadow-[0_4px_25px_rgba(0,0,0,0.5)]"
+      }`}>
+        <div className="max-w-4xl mx-auto flex items-center justify-between gap-2 sm:gap-2.5">
+          {/* Logo / Brand - Click to return to Home page */}
           {!isSearchFocused && (
             <div 
-              onClick={() => fetchWeather("New Delhi", false)} 
-              className="flex items-center gap-2 cursor-pointer group shrink-0"
-              title="Indra Weather - Reset to New Delhi"
+              onClick={() => {
+                setActiveTab("today");
+                setIsSearchFocused(false);
+                setShowSuggestions(false);
+                setSearchQuery("");
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }} 
+              className="flex items-center cursor-pointer group shrink-0"
+              title="Indra Weather - Home"
             >
-              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-sky-400/30 to-amber-400/20 border border-sky-400/40 flex items-center justify-center text-amber-300 group-hover:scale-105 transition-transform shadow-md">
-                <Sparkles className="w-4 h-4" />
-              </div>
-              <span className="text-base font-bold tracking-tight text-white group-hover:text-sky-300 transition-colors hidden sm:inline">
-                {t.appName.split(' ')[0]}
-              </span>
+              <AppLogo 
+                appName={t.appName.split(' ')[0]} 
+                size="md" 
+                className="group-hover:scale-[1.03] transition-transform" 
+                onClick={() => {
+                  setActiveTab("today");
+                  setIsSearchFocused(false);
+                  setShowSuggestions(false);
+                  setSearchQuery("");
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+              />
             </div>
           )}
 
           {/* Search Bar - Expands to full width with intense NEON styling */}
           <div className={`relative transition-all duration-300 ${isSearchFocused ? "w-full flex-1 max-w-none" : "flex-1 max-w-md"}`}>
-            <form onSubmit={handleSearch} className="relative flex items-center gap-2">
+            <form onSubmit={handleSearch} className="relative flex items-center gap-1.5 sm:gap-2">
               <div className="relative flex-1">
                 <input
                   ref={searchInputRef}
@@ -438,13 +531,13 @@ export default function App() {
                     setIsSearchFocused(true);
                     setShowSuggestions(true);
                   }}
-                  className={`w-full rounded-2xl py-2.5 px-3.5 pl-10 pr-9 text-xs sm:text-sm font-medium text-white placeholder:text-white/40 focus:outline-none transition-all ${
+                  className={`w-full rounded-xl sm:rounded-2xl py-2 sm:py-2.5 px-3 sm:px-3.5 pl-8.5 sm:pl-10 pr-8 sm:pr-9 text-xs sm:text-sm font-medium text-white placeholder:text-white/40 focus:outline-none transition-all ${
                     isSearchFocused
                       ? "bg-[#051126]/95 border-2 border-cyan-400 text-white shadow-[0_0_24px_rgba(34,211,238,0.65),0_0_48px_rgba(6,182,212,0.3),inset_0_0_12px_rgba(34,211,238,0.2)] ring-2 ring-cyan-400/30"
                       : "bg-white/[0.08] hover:bg-white/[0.12] border border-white/15 focus:border-sky-400/60 shadow-inner"
                   }`}
                 />
-                <Search className={`absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none transition-colors ${
+                <Search className={`absolute left-2.5 sm:left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 sm:w-4 sm:h-4 pointer-events-none transition-colors ${
                   isSearchFocused ? "text-cyan-400 drop-shadow-[0_0_8px_#22d3ee]" : "text-white/50"
                 }`} />
 
@@ -488,7 +581,7 @@ export default function App() {
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: 8, scale: 0.98 }}
                   transition={{ duration: 0.18 }}
-                  className="absolute top-full left-0 right-0 mt-2 bg-[#08152e]/95 backdrop-blur-3xl border-2 border-cyan-400/70 rounded-2xl overflow-hidden shadow-[0_0_35px_rgba(34,211,238,0.4),0_0_70px_rgba(6,182,212,0.2)] z-50 max-h-[75vh] sm:max-h-96 overflow-y-auto"
+                  className="absolute top-full left-0 right-0 mt-2 bg-[#08152e]/98 backdrop-blur-md border-2 border-cyan-400/70 rounded-2xl overflow-hidden shadow-[0_0_35px_rgba(34,211,238,0.4),0_0_70px_rgba(6,182,212,0.2)] z-50 max-h-[75vh] sm:max-h-96 overflow-y-auto"
                 >
                   {/* Neon Top Glowing Line */}
                   <div className="h-[2px] bg-gradient-to-r from-transparent via-cyan-400 to-transparent shadow-[0_0_12px_#22d3ee]" />
@@ -697,26 +790,26 @@ export default function App() {
                 </span>
               </button>
 
-              {/* Blue Sky Theme Toggle */}
+              {/* Morning Sky / Dark Neon Theme Toggle */}
               <button
                 id="sky-theme-toggle"
                 onClick={() => setSkyTheme((themeVal) => (themeVal === "blue-sky" ? "deep-indigo" : "blue-sky"))}
-                className={`px-2.5 py-1.5 rounded-xl border text-xs font-semibold flex items-center gap-1 transition-all active:scale-95 shadow-sm ${
+                className={`px-2.5 py-1.5 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 shadow-sm ${
                   isBlueSky
-                    ? "bg-sky-400/20 text-sky-200 border-sky-400/40"
-                    : "bg-white/[0.08] hover:bg-white/[0.14] text-white/80 border-white/15"
+                    ? "bg-amber-400/25 text-amber-100 border-amber-300/50 shadow-[0_0_12px_rgba(251,191,36,0.35)]"
+                    : "bg-cyan-500/20 text-cyan-300 border-cyan-400/50 shadow-[0_0_14px_rgba(6,182,212,0.4)]"
                 }`}
-                title="Toggle Theme"
+                title="Toggle Morning Sky / Dark Neon"
               >
                 {isBlueSky ? (
                   <>
-                    <Sun className="w-3.5 h-3.5 text-amber-300" />
-                    <span className="hidden md:inline">{t.blueSky}</span>
+                    <Sun className="w-3.5 h-3.5 text-amber-300 animate-[spin_12s_linear_infinite]" />
+                    <span className="hidden sm:inline">Morning Sky</span>
                   </>
                 ) : (
                   <>
-                    <Moon className="w-3.5 h-3.5 text-indigo-300" />
-                    <span className="hidden md:inline">{t.midnight}</span>
+                    <Moon className="w-3.5 h-3.5 text-cyan-300" />
+                    <span className="hidden sm:inline">Dark Neon</span>
                   </>
                 )}
               </button>
@@ -729,27 +822,6 @@ export default function App() {
                 title="Toggle Celsius / Fahrenheit"
               >
                 °{unit}
-              </button>
-
-              {/* Refresh */}
-              <button
-                id="refresh-weather-btn"
-                onClick={handleRefresh}
-                disabled={isRefreshing}
-                className="p-2 rounded-xl bg-white/[0.08] hover:bg-white/[0.14] active:scale-95 border border-white/15 text-white/80 hover:text-white transition-all shadow-sm"
-                title={t.refresh}
-              >
-                <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin text-amber-400" : ""}`} />
-              </button>
-
-              {/* Settings Button */}
-              <button
-                id="app-settings-btn"
-                onClick={() => setIsSettingsOpen(true)}
-                className="p-2 rounded-xl bg-white/[0.08] hover:bg-white/[0.14] active:scale-95 border border-white/15 text-white/80 hover:text-amber-300 transition-all shadow-sm"
-                title={t.settings}
-              >
-                <SettingsIcon className="w-3.5 h-3.5 text-sky-300" />
               </button>
 
               <PWAInstallButton variant="header" />
@@ -776,7 +848,7 @@ export default function App() {
       </AnimatePresence>
 
       {/* Main App Content Viewport - Blurs when search is focused */}
-      <main className={`max-w-4xl mx-auto px-4 py-4 pb-28 space-y-4 transition-all duration-300 ${
+      <main className={`max-w-4xl mx-auto px-3 sm:px-4 pt-2.5 sm:pt-4 pb-20 sm:pb-28 space-y-3 sm:space-y-4 transition-all duration-300 ${
         isSearchFocused ? "filter blur-md opacity-25 pointer-events-none select-none" : ""
       }`}>
         {/* Gentle Location Access Tip (shows smoothly only if user tapped My Location and browser blocked it) */}
@@ -849,7 +921,7 @@ export default function App() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -12 }}
                 transition={{ duration: 0.22 }}
-                className="space-y-4"
+                className="space-y-3 sm:space-y-4"
               >
                 {/* Quick Indian Metros Bar */}
                 <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
@@ -859,163 +931,232 @@ export default function App() {
                       weather.location.name.toLowerCase().includes(metro.name.toLowerCase())
                     );
                     return (
-                      <button
+                      <motion.button
                         key={metro.name}
+                        whileHover={{ scale: 1.06, y: -1 }}
+                        whileTap={{ scale: 0.95 }}
+                        transition={{ type: "spring", stiffness: 400, damping: 20 }}
                         onClick={() => fetchWeather(metro.query, false, metro.name)}
-                        className={`px-3.5 py-1.5 rounded-xl text-xs font-medium whitespace-nowrap transition-all active:scale-95 border ${
+                        className={`px-3 sm:px-3.5 py-1 sm:py-1.5 rounded-lg sm:rounded-xl text-[11px] sm:text-xs font-medium whitespace-nowrap transition-colors border ${
                           isSelected
                             ? "bg-amber-400/25 text-amber-300 border-amber-400/50 shadow-[0_0_12px_rgba(251,191,36,0.2)] font-semibold"
                             : "bg-white/[0.06] hover:bg-white/[0.12] text-white/70 hover:text-white border-white/10"
                         }`}
                       >
                         {metro.name}
-                      </button>
+                      </motion.button>
                     );
                   })}
                 </div>
 
-                {/* Centerpiece Hero Card */}
-                <GlassCard className="p-6 sm:p-8 relative overflow-hidden bg-gradient-to-b from-white/[0.12] via-white/[0.06] to-transparent border-white/20 shadow-xl">
-                  {/* Top Meta Line: Location & Status */}
-                  <div className="flex items-center justify-between gap-2 mb-4">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <MapPin className="w-4 h-4 text-amber-400 shrink-0" />
-                      <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white truncate">
-                        {customDisplayName || weather.location.name}
-                      </h1>
-                      <span className="text-xs text-sky-200/60 truncate hidden sm:inline">
-                        {weather.location.region ? `${weather.location.region}, ` : ''}{weather.location.country}
-                      </span>
-                    </div>
+                {/* Centerpiece Hero Card with Ambient Floating Atmosphere & Hover Lift */}
+                <motion.div
+                  whileHover={{ y: -3 }}
+                  transition={{ type: "spring", stiffness: 320, damping: 22 }}
+                  className="w-full"
+                >
+                  <GlassCard className="p-4 sm:p-7 relative overflow-hidden bg-gradient-to-b from-white/[0.12] via-white/[0.06] to-transparent border-white/20 shadow-xl group hover:border-white/35 transition-all">
+                    {/* Ambient Weather Glow Orbs inside Hero Card - Hardware-accelerated radial gradients */}
+                    <div 
+                      className="absolute -top-12 -right-12 w-48 h-48 rounded-full pointer-events-none opacity-60"
+                      style={{
+                        background: 'radial-gradient(circle, rgba(56, 189, 248, 0.25) 0%, transparent 70%)'
+                      }}
+                    />
+                    <div 
+                      className="absolute -bottom-10 -left-10 w-44 h-44 rounded-full pointer-events-none opacity-60"
+                      style={{
+                        background: 'radial-gradient(circle, rgba(251, 191, 36, 0.22) 0%, transparent 70%)'
+                      }}
+                    />
 
-                    {isLiveLocation ? (
-                      <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-400/20 border border-emerald-400/40 text-emerald-300 text-[10px] font-semibold">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                        <span>{t.liveLocation}</span>
+                    {/* Top Meta Line: Location & Status */}
+                    <div className="flex items-center justify-between gap-2 mb-2.5 sm:mb-4 relative z-10">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <MapPin className="w-4 h-4 text-amber-400 shrink-0" />
+                        <h1 className="text-lg sm:text-2xl font-bold tracking-tight text-white truncate">
+                          {customDisplayName || weather.location.name}
+                        </h1>
+                        <span className="text-xs text-sky-200/60 truncate hidden sm:inline">
+                          {weather.location.region ? `${weather.location.region}, ` : ''}{weather.location.country}
+                        </span>
                       </div>
-                    ) : (
-                      <div className="text-[10px] text-sky-200/50 font-medium">
-                        {weather.location.name.toLowerCase() === "new delhi" ? t.defaultCity : t.selectedCity}
-                      </div>
-                    )}
-                  </div>
 
-                  {/* Main Temperature & Condition Row */}
-                  <div className="flex flex-col sm:flex-row items-center justify-between gap-4 py-2">
-                    <div className="flex items-center gap-4">
-                      <div className="text-7xl sm:text-8xl font-light tracking-tighter text-white drop-shadow-[0_4px_12px_rgba(0,0,0,0.3)]">
-                        {formatTemp(weather.current.temp_c)}
-                      </div>
-                      <div className="space-y-1">
-                        <div className="text-base sm:text-lg font-medium text-white/95">
-                          {weather.current.condition.text}
+                      {isLiveLocation ? (
+                        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-400/20 border border-emerald-400/40 text-emerald-300 text-[10px] font-semibold shadow-sm">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                          <span>{t.liveLocation}</span>
                         </div>
-                        <div className="text-xs text-sky-200/70 space-x-2">
-                          <span>{t.feelsLike} {formatTemp(weather.current.feelslike_c ?? weather.current.temp_c)}</span>
+                      ) : (
+                        <div className="text-[10px] text-sky-200/50 font-medium">
+                          {weather.location.name.toLowerCase() === "new delhi" ? t.defaultCity : t.selectedCity}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Main Temperature & Condition Row */}
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4 py-1 sm:py-2 relative z-10">
+                      <div className="flex items-center gap-3 sm:gap-4">
+                        <div className="text-5xl sm:text-7xl md:text-8xl font-light tracking-tighter text-white drop-shadow-[0_4px_12px_rgba(0,0,0,0.3)]">
+                          {formatTemp(weather.current.temp_c)}
+                        </div>
+                        <div className="space-y-0.5 sm:space-y-1">
+                          <div className="text-sm sm:text-lg font-medium text-white/95">
+                            {weather.current.condition.text}
+                          </div>
+                          <div className="text-xs text-sky-200/70 space-x-2">
+                            <span>{t.feelsLike} {formatTemp(weather.current.feelslike_c ?? weather.current.temp_c)}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Floating Weather Illustration with GPU Compositor Animation */}
+                      <div 
+                        className="shrink-0 flex items-center justify-center relative cursor-pointer"
+                        title={weather.current.condition.text}
+                      >
+                        {/* Radiant Ambient Weather Glow */}
+                        <div 
+                          className="absolute inset-0 rounded-full scale-110 pointer-events-none"
+                          style={{
+                            background: 'radial-gradient(circle, rgba(251, 191, 36, 0.28) 0%, transparent 70%)'
+                          }}
+                        />
+                        
+                        {/* Continuous Gentle Floating via CSS Animation */}
+                        <div className="relative z-10 anim-float">
+                          <img
+                            src={weather.current.condition.icon.replace('64x64', '128x128')}
+                            alt={weather.current.condition.text}
+                            className="w-20 h-20 sm:w-26 sm:h-26 md:w-28 md:h-28 drop-shadow-[0_8px_16px_rgba(251,191,36,0.3)] select-none pointer-events-none"
+                          />
                         </div>
                       </div>
                     </div>
 
-                    {/* Weather Illustration */}
-                    <div className="shrink-0 flex items-center justify-center">
-                      <img
-                        src={weather.current.condition.icon.replace('64x64', '128x128')}
-                        alt={weather.current.condition.text}
-                        className="w-24 h-24 sm:w-28 sm:h-28 drop-shadow-[0_12px_24px_rgba(251,191,36,0.35)]"
-                      />
+                    {/* High / Low Bar */}
+                    <div className="flex items-center justify-between pt-2.5 sm:pt-4 mt-1 sm:mt-2 border-t border-white/10 text-xs text-sky-200/70 relative z-10">
+                      <div className="flex items-center gap-3">
+                        <span className="flex items-center gap-1 text-white/90">
+                          <ArrowUp className="w-3.5 h-3.5 text-amber-400" />
+                          {t.high} {formatTemp(weather.forecast.forecastday[0].day.maxtemp_c)}
+                        </span>
+                        <span className="flex items-center gap-1 text-white/90">
+                          <ArrowDown className="w-3.5 h-3.5 text-sky-400" />
+                          {t.low} {formatTemp(weather.forecast.forecastday[0].day.mintemp_c)}
+                        </span>
+                      </div>
+                      <div className="text-[11px] text-sky-200/50">
+                        {weather.location.localtime ? `Local: ${weather.location.localtime.split(' ')[1]}` : 'Real-time'}
+                      </div>
                     </div>
-                  </div>
-
-                  {/* High / Low Bar */}
-                  <div className="flex items-center justify-between pt-4 mt-2 border-t border-white/10 text-xs text-sky-200/70">
-                    <div className="flex items-center gap-3">
-                      <span className="flex items-center gap-1 text-white/90">
-                        <ArrowUp className="w-3.5 h-3.5 text-amber-400" />
-                        {t.high} {formatTemp(weather.forecast.forecastday[0].day.maxtemp_c)}
-                      </span>
-                      <span className="flex items-center gap-1 text-white/90">
-                        <ArrowDown className="w-3.5 h-3.5 text-sky-400" />
-                        {t.low} {formatTemp(weather.forecast.forecastday[0].day.mintemp_c)}
-                      </span>
-                    </div>
-                    <div className="text-[11px] text-sky-200/50">
-                      {weather.location.localtime ? `Local: ${weather.location.localtime.split(' ')[1]}` : 'Real-time'}
-                    </div>
-                  </div>
-                </GlassCard>
+                  </GlassCard>
+                </motion.div>
 
                 {/* 4 Minimal Metric Cards */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
                   {/* Wind */}
-                  <GlassCard className="p-4 flex flex-col justify-between">
-                    <div className="flex items-center justify-between text-sky-200/60 mb-2">
-                      <span className="text-[11px] font-medium">{t.wind}</span>
-                      <Wind className="w-4 h-4 text-sky-400" />
-                    </div>
-                    <div>
-                      <span className="text-xl font-semibold text-white">
-                        {Math.round(weather.current.wind_kph)}
-                      </span>
-                      <span className="text-xs text-sky-200/60 ml-1">km/h</span>
-                    </div>
-                  </GlassCard>
+                  <motion.div
+                    initial={{ opacity: 0, y: 18 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    whileHover={{ y: -4, scale: 1.02 }}
+                    transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+                    className="h-full cursor-pointer"
+                  >
+                    <GlassCard className="p-3 sm:p-4 flex flex-col justify-between h-full hover:bg-white/[0.13] hover:border-white/30 transition-all shadow-md">
+                      <div className="flex items-center justify-between text-sky-200/60 mb-1.5 sm:mb-2">
+                        <span className="text-[10px] sm:text-[11px] font-medium">{t.wind}</span>
+                        <Wind className="w-4 h-4 text-sky-400" />
+                      </div>
+                      <div>
+                        <span className="text-lg sm:text-xl font-semibold text-white">
+                          {Math.round(weather.current.wind_kph)}
+                        </span>
+                        <span className="text-xs text-sky-200/60 ml-1">km/h</span>
+                      </div>
+                    </GlassCard>
+                  </motion.div>
 
                   {/* Humidity */}
-                  <GlassCard className="p-4 flex flex-col justify-between">
-                    <div className="flex items-center justify-between text-sky-200/60 mb-2">
-                      <span className="text-[11px] font-medium">{t.humidity}</span>
-                      <Droplets className="w-4 h-4 text-blue-400" />
-                    </div>
-                    <div>
-                      <span className="text-xl font-semibold text-white">
-                        {weather.current.humidity}
-                      </span>
-                      <span className="text-xs text-sky-200/60 ml-1">%</span>
-                    </div>
-                  </GlassCard>
+                  <motion.div
+                    initial={{ opacity: 0, y: 18 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    whileHover={{ y: -4, scale: 1.02 }}
+                    transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+                    className="h-full cursor-pointer"
+                  >
+                    <GlassCard className="p-3 sm:p-4 flex flex-col justify-between h-full hover:bg-white/[0.13] hover:border-white/30 transition-all shadow-md">
+                      <div className="flex items-center justify-between text-sky-200/60 mb-1.5 sm:mb-2">
+                        <span className="text-[10px] sm:text-[11px] font-medium">{t.humidity}</span>
+                        <Droplets className="w-4 h-4 text-blue-400" />
+                      </div>
+                      <div>
+                        <span className="text-lg sm:text-xl font-semibold text-white">
+                          {weather.current.humidity}
+                        </span>
+                        <span className="text-xs text-sky-200/60 ml-1">%</span>
+                      </div>
+                    </GlassCard>
+                  </motion.div>
 
                   {/* UV Index */}
-                  <GlassCard className="p-4 flex flex-col justify-between">
-                    <div className="flex items-center justify-between text-sky-200/60 mb-2">
-                      <span className="text-[11px] font-medium">{t.uvIndex}</span>
-                      <Sun className="w-4 h-4 text-amber-400" />
-                    </div>
-                    <div>
-                      <span className="text-xl font-semibold text-white">
-                        {weather.current.uv}
-                      </span>
-                      <span className="text-xs text-amber-300 ml-1 font-semibold">
-                        {weather.current.uv >= 8 ? t.uvVeryHigh : weather.current.uv >= 6 ? t.uvHigh : weather.current.uv >= 3 ? t.uvMod : t.uvLow}
-                      </span>
-                    </div>
-                  </GlassCard>
+                  <motion.div
+                    initial={{ opacity: 0, y: 18 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    whileHover={{ y: -4, scale: 1.02 }}
+                    transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+                    className="h-full cursor-pointer"
+                  >
+                    <GlassCard className="p-3 sm:p-4 flex flex-col justify-between h-full hover:bg-white/[0.13] hover:border-white/30 transition-all shadow-md">
+                      <div className="flex items-center justify-between text-sky-200/60 mb-1.5 sm:mb-2">
+                        <span className="text-[10px] sm:text-[11px] font-medium">{t.uvIndex}</span>
+                        <Sun className="w-4 h-4 text-amber-400" />
+                      </div>
+                      <div>
+                        <span className="text-lg sm:text-xl font-semibold text-white">
+                          {weather.current.uv}
+                        </span>
+                        <span className="text-xs text-amber-300 ml-1 font-semibold">
+                          {weather.current.uv >= 8 ? t.uvVeryHigh : weather.current.uv >= 6 ? t.uvHigh : weather.current.uv >= 3 ? t.uvMod : t.uvLow}
+                        </span>
+                      </div>
+                    </GlassCard>
+                  </motion.div>
 
                   {/* Air Quality */}
-                  <GlassCard className="p-4 flex flex-col justify-between">
-                    <div className="flex items-center justify-between text-sky-200/60 mb-2">
-                      <span className="text-[11px] font-medium">{t.airQuality}</span>
-                      <Gauge className="w-4 h-4 text-emerald-400" />
-                    </div>
-                    <div>
-                      <span className={`text-sm font-semibold truncate block ${aqiInfo.color}`}>
-                        {aqiInfo.label}
-                      </span>
-                      <span className="text-[10px] text-sky-200/50">US EPA Index</span>
-                    </div>
-                  </GlassCard>
+                  <motion.div
+                    initial={{ opacity: 0, y: 18 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    whileHover={{ y: -4, scale: 1.02 }}
+                    transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+                    className="h-full cursor-pointer"
+                  >
+                    <GlassCard className="p-3 sm:p-4 flex flex-col justify-between h-full hover:bg-white/[0.13] hover:border-white/30 transition-all shadow-md">
+                      <div className="flex items-center justify-between text-sky-200/60 mb-1.5 sm:mb-2">
+                        <span className="text-[10px] sm:text-[11px] font-medium">{t.airQuality}</span>
+                        <Gauge className="w-4 h-4 text-emerald-400" />
+                      </div>
+                      <div>
+                        <span className={`text-xs sm:text-sm font-semibold truncate block ${aqiInfo.color}`}>
+                          {aqiInfo.label}
+                        </span>
+                        <span className="text-[9.5px] sm:text-[10px] text-sky-200/50">US EPA Index</span>
+                      </div>
+                    </GlassCard>
+                  </motion.div>
                 </div>
 
                 {/* 24-Hour Forecast (Clean Horizontal Scroll) */}
-                <div className="space-y-2">
+                <div className="space-y-1.5 sm:space-y-2">
                   <div className="flex items-center justify-between px-1 text-xs text-sky-200/70">
                     <div className="flex items-center gap-1.5 font-semibold text-white">
                       <Clock className="w-3.5 h-3.5 text-amber-400" />
                       <span>{t.hourlyForecast}</span>
                     </div>
-                    <span className="text-[11px]">{t.next24h}</span>
+                    <span className="text-[10px] sm:text-[11px]">{t.next24h}</span>
                   </div>
 
-                  <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+                  <div className="flex gap-1.5 sm:gap-2 overflow-x-auto pb-1 no-scrollbar touch-pan-x overscroll-x-contain">
                     {weather.forecast.forecastday[0].hour
                       .filter((_, idx) => idx % 2 === 0)
                       .map((h, i) => {
@@ -1024,15 +1165,15 @@ export default function App() {
                         return (
                           <div
                             key={i}
-                            className="flex-shrink-0 w-20 py-3 px-2 rounded-2xl bg-white/[0.07] hover:bg-white/[0.12] border border-white/10 flex flex-col items-center gap-1.5 text-center transition-all shadow-sm"
+                            className="flex-shrink-0 w-[70px] sm:w-20 py-2 sm:py-3 px-1 sm:px-2 rounded-xl sm:rounded-2xl bg-white/[0.07] hover:bg-white/[0.14] active:scale-95 border border-white/10 hover:border-white/25 flex flex-col items-center gap-1 sm:gap-1.5 text-center transition-all duration-150 shadow-sm cursor-pointer select-none"
                           >
-                            <span className="text-[10px] text-sky-200/60 font-medium">{hourDisplay}</span>
-                            <img src={h.condition.icon} alt="hour condition" className="w-8 h-8" />
-                            <span className="text-xs font-semibold text-white">{formatTemp(h.temp_c)}</span>
+                            <span className="text-[9.5px] sm:text-[10px] text-sky-200/60 font-medium">{hourDisplay}</span>
+                            <img src={h.condition.icon} alt="hour condition" className="w-7 h-7 sm:w-8 sm:h-8 pointer-events-none" />
+                            <span className="text-[11px] sm:text-xs font-semibold text-white">{formatTemp(h.temp_c)}</span>
                             {h.chance_of_rain !== undefined && h.chance_of_rain > 0 ? (
-                              <span className="text-[9px] text-sky-300 font-medium">{h.chance_of_rain}%</span>
+                              <span className="text-[8.5px] sm:text-[9px] text-sky-300 font-medium">{h.chance_of_rain}%</span>
                             ) : (
-                              <span className="text-[9px] text-white/30">-</span>
+                              <span className="text-[8.5px] sm:text-[9px] text-white/30">-</span>
                             )}
                           </div>
                         );
@@ -1041,25 +1182,69 @@ export default function App() {
                 </div>
 
                 {/* Sun Glance Tiles */}
-                <div className="grid grid-cols-2 gap-3">
-                  <GlassCard className="p-3.5 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Sunrise className="w-4 h-4 text-amber-400" />
-                      <div>
-                        <p className="text-[10px] text-sky-200/60 font-medium">{t.sunrise}</p>
-                        <p className="text-xs font-bold text-white">{weather.forecast.forecastday[0].astro.sunrise}</p>
+                <div className="grid grid-cols-2 gap-2 sm:gap-3">
+                  <motion.div
+                    initial={{ opacity: 0, y: 16 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    whileHover={{ y: -3, scale: 1.02 }}
+                    transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+                    className="h-full cursor-pointer"
+                  >
+                    <GlassCard className="p-2.5 sm:p-3.5 flex items-center justify-between h-full hover:bg-white/[0.13] hover:border-white/30 transition-all shadow-md">
+                      <div className="flex items-center gap-2">
+                        <Sunrise className="w-4 h-4 text-amber-400" />
+                        <div>
+                          <p className="text-[9.5px] sm:text-[10px] text-sky-200/60 font-medium">{t.sunrise}</p>
+                          <p className="text-xs font-bold text-white">{weather.forecast.forecastday[0].astro.sunrise}</p>
+                        </div>
                       </div>
-                    </div>
-                  </GlassCard>
-                  <GlassCard className="p-3.5 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Sunset className="w-4 h-4 text-orange-400" />
-                      <div>
-                        <p className="text-[10px] text-sky-200/60 font-medium">{t.sunset}</p>
-                        <p className="text-xs font-bold text-white">{weather.forecast.forecastday[0].astro.sunset}</p>
+                    </GlassCard>
+                  </motion.div>
+
+                  <motion.div
+                    initial={{ opacity: 0, y: 16 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    whileHover={{ y: -3, scale: 1.02 }}
+                    transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+                    className="h-full cursor-pointer"
+                  >
+                    <GlassCard className="p-2.5 sm:p-3.5 flex items-center justify-between h-full hover:bg-white/[0.13] hover:border-white/30 transition-all shadow-md">
+                      <div className="flex items-center gap-2">
+                        <Sunset className="w-4 h-4 text-orange-400" />
+                        <div>
+                          <p className="text-[9.5px] sm:text-[10px] text-sky-200/60 font-medium">{t.sunset}</p>
+                          <p className="text-xs font-bold text-white">{weather.forecast.forecastday[0].astro.sunset}</p>
+                        </div>
                       </div>
+                    </GlassCard>
+                  </motion.div>
+                </div>
+
+                {/* Animated Glowing Transition Divider Line & Section Header */}
+                <div className="pt-2 sm:pt-3 pb-0.5 space-y-2">
+                  <div className="flex items-center gap-2.5 sm:gap-3">
+                    {/* Glowing Left Line with Shimmer Beam */}
+                    <div className="h-[1.5px] flex-1 bg-gradient-to-r from-transparent via-sky-400/40 to-sky-400/80 relative overflow-hidden rounded-full">
+                      <div className="absolute inset-0 w-1/2 bg-gradient-to-r from-transparent via-white to-transparent anim-beam" />
                     </div>
-                  </GlassCard>
+
+                    {/* Aesthetic Animated Badge */}
+                    <div className="flex items-center gap-2 px-3 py-1 sm:px-3.5 sm:py-1.5 rounded-full bg-gradient-to-r from-sky-500/20 via-indigo-500/20 to-purple-500/20 border border-sky-400/35 shadow-[0_0_15px_rgba(56,189,248,0.25)] backdrop-blur-md">
+                      <div className="relative flex items-center justify-center">
+                        <span className="animate-ping absolute inline-flex h-2.5 w-2.5 rounded-full bg-amber-400 opacity-75" />
+                        <Sparkles className="w-3.5 h-3.5 text-amber-300 relative z-10" />
+                      </div>
+                      <span className="text-[10.5px] sm:text-xs font-bold tracking-wider uppercase text-sky-200">
+                        {language === 'hi' ? 'दैनिक मौसम सारांश और सलाह' : 'Weather Advisory & Intel'}
+                      </span>
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    </div>
+
+                    {/* Glowing Right Line with Shimmer Beam */}
+                    <div className="h-[1.5px] flex-1 bg-gradient-to-r from-sky-400/80 via-sky-400/40 to-transparent relative overflow-hidden rounded-full">
+                      <div className="absolute inset-0 w-1/2 bg-gradient-to-r from-transparent via-white to-transparent anim-beam" />
+                    </div>
+                  </div>
                 </div>
 
                 {/* Plain-Language Mini Weather Summary (Zero Jargon • Easy to Understand) */}
@@ -1083,7 +1268,7 @@ export default function App() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -12 }}
                 transition={{ duration: 0.22 }}
-                className="space-y-4"
+                className="space-y-3 sm:space-y-4"
               >
                 {/* Section Header */}
                 <div className="flex items-center justify-between px-1">
@@ -1100,7 +1285,7 @@ export default function App() {
                 </div>
 
                 {/* 7-Day Forecast (Minimal Row List) */}
-                <GlassCard className="p-4 sm:p-5 space-y-2">
+                <GlassCard className="p-3.5 sm:p-5 space-y-1.5 sm:space-y-2">
                   <div className="divide-y divide-white/[0.08]">
                     {weather.forecast.forecastday.map((d, index) => {
                       const dayDate = new Date(d.date);
@@ -1109,27 +1294,27 @@ export default function App() {
                       return (
                         <div
                           key={d.date}
-                          className="py-3 px-1 flex items-center justify-between gap-3 text-xs hover:bg-white/[0.03] rounded-xl transition-colors"
+                          className="py-2.5 sm:py-3 px-1 flex items-center justify-between gap-2.5 sm:gap-3 text-xs hover:bg-white/[0.03] rounded-xl transition-colors"
                         >
                           {/* Day Name */}
-                          <div className="w-20 shrink-0">
-                            <span className="font-semibold text-white text-sm block">
+                          <div className="w-18 sm:w-20 shrink-0">
+                            <span className="font-semibold text-white text-xs sm:text-sm block">
                               {dayName}
                             </span>
-                            <span className="text-[10px] text-sky-200/50">
+                            <span className="text-[9.5px] sm:text-[10px] text-sky-200/50">
                               {dayDate.toLocaleDateString([], { month: "short", day: "numeric" })}
                             </span>
                           </div>
 
                           {/* Condition Icon & Text */}
-                          <div className="flex items-center gap-2 flex-1 min-w-0">
-                            <img src={d.day.condition.icon} alt="condition" className="w-8 h-8 shrink-0" />
+                          <div className="flex items-center gap-1.5 sm:gap-2 flex-1 min-w-0">
+                            <img src={d.day.condition.icon} alt="condition" className="w-7 h-7 sm:w-8 sm:h-8 shrink-0" />
                             <div className="min-w-0">
                               <span className="text-white/90 truncate text-xs block font-medium">
                                 {d.day.condition.text}
                               </span>
                               {rainChance > 10 && (
-                                <span className="text-[10px] text-sky-300 font-medium">
+                                <span className="text-[9.5px] sm:text-[10px] text-sky-300 font-medium">
                                   🌧️ {rainChance}% rain
                                 </span>
                               )}
@@ -1155,16 +1340,16 @@ export default function App() {
                 </GlassCard>
 
                 {/* Detailed 24-Hour Timeline */}
-                <div className="space-y-2">
+                <div className="space-y-1.5 sm:space-y-2">
                   <div className="flex items-center justify-between px-1 text-xs text-sky-200/70">
                     <div className="flex items-center gap-1.5 font-semibold text-white">
                       <Clock className="w-3.5 h-3.5 text-amber-400" />
                       <span>{t.hourlyForecast}</span>
                     </div>
-                    <span className="text-[11px]">{t.next24h}</span>
+                    <span className="text-[10px] sm:text-[11px]">{t.next24h}</span>
                   </div>
 
-                  <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+                  <div className="flex gap-1.5 sm:gap-2 overflow-x-auto pb-1 no-scrollbar touch-pan-x overscroll-x-contain">
                     {weather.forecast.forecastday[0].hour
                       .filter((_, idx) => idx % 2 === 0)
                       .map((h, i) => {
@@ -1173,15 +1358,15 @@ export default function App() {
                         return (
                           <div
                             key={i}
-                            className="flex-shrink-0 w-20 py-3 px-2 rounded-2xl bg-white/[0.07] hover:bg-white/[0.12] border border-white/10 flex flex-col items-center gap-1.5 text-center transition-all shadow-sm"
+                            className="flex-shrink-0 w-[70px] sm:w-20 py-2 sm:py-3 px-1.5 sm:px-2 rounded-xl sm:rounded-2xl bg-white/[0.07] hover:bg-white/[0.12] border border-white/10 flex flex-col items-center gap-1 sm:gap-1.5 text-center transition-all shadow-sm"
                           >
-                            <span className="text-[10px] text-sky-200/60 font-medium">{hourDisplay}</span>
-                            <img src={h.condition.icon} alt="hour condition" className="w-8 h-8" />
-                            <span className="text-xs font-semibold text-white">{formatTemp(h.temp_c)}</span>
+                            <span className="text-[9.5px] sm:text-[10px] text-sky-200/60 font-medium">{hourDisplay}</span>
+                            <img src={h.condition.icon} alt="hour condition" className="w-7 h-7 sm:w-8 sm:h-8" />
+                            <span className="text-[11px] sm:text-xs font-semibold text-white">{formatTemp(h.temp_c)}</span>
                             {h.chance_of_rain !== undefined && h.chance_of_rain > 0 ? (
-                              <span className="text-[9px] text-sky-300 font-medium">{h.chance_of_rain}%</span>
+                              <span className="text-[8.5px] sm:text-[9px] text-sky-300 font-medium">{h.chance_of_rain}%</span>
                             ) : (
-                              <span className="text-[9px] text-white/30">-</span>
+                              <span className="text-[8.5px] sm:text-[9px] text-white/30">-</span>
                             )}
                           </div>
                         );
@@ -1190,43 +1375,43 @@ export default function App() {
                 </div>
 
                 {/* Sun & Atmospheric Details */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  <GlassCard className="p-4">
-                    <div className="flex items-center gap-1.5 text-sky-200/60 text-[11px] mb-1">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+                  <GlassCard className="p-3 sm:p-4">
+                    <div className="flex items-center gap-1.5 text-sky-200/60 text-[10px] sm:text-[11px] mb-1">
                       <Sunrise className="w-3.5 h-3.5 text-amber-400" />
                       <span>{t.sunrise}</span>
                     </div>
-                    <div className="text-sm font-semibold text-white">
+                    <div className="text-xs sm:text-sm font-semibold text-white">
                       {weather.forecast.forecastday[0].astro.sunrise}
                     </div>
                   </GlassCard>
 
-                  <GlassCard className="p-4">
-                    <div className="flex items-center gap-1.5 text-sky-200/60 text-[11px] mb-1">
+                  <GlassCard className="p-3 sm:p-4">
+                    <div className="flex items-center gap-1.5 text-sky-200/60 text-[10px] sm:text-[11px] mb-1">
                       <Sunset className="w-3.5 h-3.5 text-orange-400" />
                       <span>{t.sunset}</span>
                     </div>
-                    <div className="text-sm font-semibold text-white">
+                    <div className="text-xs sm:text-sm font-semibold text-white">
                       {weather.forecast.forecastday[0].astro.sunset}
                     </div>
                   </GlassCard>
 
-                  <GlassCard className="p-4">
-                    <div className="flex items-center gap-1.5 text-sky-200/60 text-[11px] mb-1">
+                  <GlassCard className="p-3 sm:p-4">
+                    <div className="flex items-center gap-1.5 text-sky-200/60 text-[10px] sm:text-[11px] mb-1">
                       <Eye className="w-3.5 h-3.5 text-sky-400" />
                       <span>{t.visibility}</span>
                     </div>
-                    <div className="text-sm font-semibold text-white">
+                    <div className="text-xs sm:text-sm font-semibold text-white">
                       {weather.current.vis_km ?? 10} km
                     </div>
                   </GlassCard>
 
-                  <GlassCard className="p-4">
-                    <div className="flex items-center gap-1.5 text-sky-200/60 text-[11px] mb-1">
+                  <GlassCard className="p-3 sm:p-4">
+                    <div className="flex items-center gap-1.5 text-sky-200/60 text-[10px] sm:text-[11px] mb-1">
                       <Compass className="w-3.5 h-3.5 text-emerald-400" />
                       <span>{t.pressure}</span>
                     </div>
-                    <div className="text-sm font-semibold text-white">
+                    <div className="text-xs sm:text-sm font-semibold text-white">
                       {weather.current.pressure_mb ?? 1012} hPa
                     </div>
                   </GlassCard>
@@ -1242,7 +1427,7 @@ export default function App() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -12 }}
                 transition={{ duration: 0.22 }}
-                className="space-y-4"
+                className="space-y-3 sm:space-y-4"
               >
                 {/* Section Header */}
                 <div className="flex items-center justify-between px-1">
@@ -1259,8 +1444,8 @@ export default function App() {
                 </div>
 
                 {/* Big AQI Diagnostic Card */}
-                <GlassCard className="p-6 relative overflow-hidden bg-gradient-to-b from-white/[0.1] to-white/[0.04] border-white/20">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <GlassCard className="p-4 sm:p-6 relative overflow-hidden bg-gradient-to-b from-white/[0.1] to-white/[0.04] border-white/20">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
                         <span className="text-xs uppercase tracking-wider font-bold text-sky-300">US EPA Standard</span>
@@ -1268,10 +1453,10 @@ export default function App() {
                           Index: {weather.current.air_quality?.["us-epa-index"] ?? 1} / 6
                         </span>
                       </div>
-                      <h3 className={`text-2xl font-bold ${aqiInfo.color}`}>
+                      <h3 className={`text-xl sm:text-2xl font-bold ${aqiInfo.color}`}>
                         {aqiInfo.label} Air Quality
                       </h3>
-                      <p className="text-xs text-sky-100/70 max-w-lg leading-relaxed pt-1">
+                      <p className="text-xs text-sky-100/70 max-w-lg leading-relaxed pt-0.5 sm:pt-1">
                         {weather.current.air_quality?.["us-epa-index"] === 1 && "Air quality is considered satisfactory, and air pollution poses little or no risk. Perfect for outdoor exercises and morning runs."}
                         {weather.current.air_quality?.["us-epa-index"] === 2 && "Air quality is acceptable; however, very sensitive individuals may experience minor symptoms. General public can enjoy outdoors normally."}
                         {weather.current.air_quality?.["us-epa-index"] === 3 && "Members of sensitive groups (children, elderly, people with asthma) may experience health effects. Limit prolonged outdoor exertion."}
@@ -1281,16 +1466,16 @@ export default function App() {
                     </div>
 
                     <div className="shrink-0 flex items-center gap-3">
-                      <div className="w-16 h-16 rounded-2xl bg-white/[0.08] border border-white/15 flex flex-col items-center justify-center text-center">
-                        <Activity className="w-6 h-6 text-emerald-400 mb-1" />
-                        <span className="text-[10px] font-bold text-white/80">AQI Live</span>
+                      <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-white/[0.08] border border-white/15 flex flex-col items-center justify-center text-center">
+                        <Activity className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-400 mb-0.5 sm:mb-1" />
+                        <span className="text-[9.5px] sm:text-[10px] font-bold text-white/80">AQI Live</span>
                       </div>
                     </div>
                   </div>
 
                   {/* AQI 6-step Spectrum Bar */}
-                  <div className="mt-5 pt-4 border-t border-white/10 space-y-1.5">
-                    <div className="flex justify-between text-[10px] font-medium text-sky-200/60">
+                  <div className="mt-4 sm:mt-5 pt-3 sm:pt-4 border-t border-white/10 space-y-1.5">
+                    <div className="flex justify-between text-[9.5px] sm:text-[10px] font-medium text-sky-200/60">
                       <span>Good (1)</span>
                       <span>Moderate (2)</span>
                       <span>Sensitive (3)</span>
@@ -1309,7 +1494,7 @@ export default function App() {
                 </GlassCard>
 
                 {/* UV Index & Sun Protection Station */}
-                <GlassCard className="p-5 space-y-3">
+                <GlassCard className="p-4 sm:p-5 space-y-2.5 sm:space-y-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <Sun className="w-4 h-4 text-amber-400" />
@@ -1329,49 +1514,49 @@ export default function App() {
                 </GlassCard>
 
                 {/* Atmospheric Telemetry Grid */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  <GlassCard className="p-4">
-                    <div className="flex items-center gap-1.5 text-sky-200/60 text-[11px] mb-1">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+                  <GlassCard className="p-3 sm:p-4">
+                    <div className="flex items-center gap-1.5 text-sky-200/60 text-[10px] sm:text-[11px] mb-1">
                       <Compass className="w-3.5 h-3.5 text-emerald-400" />
                       <span>{t.pressure}</span>
                     </div>
-                    <div className="text-sm font-semibold text-white">
+                    <div className="text-xs sm:text-sm font-semibold text-white">
                       {weather.current.pressure_mb ?? 1012} hPa
                     </div>
-                    <span className="text-[10px] text-sky-200/50 mt-1 block">Barometric</span>
+                    <span className="text-[9.5px] sm:text-[10px] text-sky-200/50 mt-1 block">Barometric</span>
                   </GlassCard>
 
-                  <GlassCard className="p-4">
-                    <div className="flex items-center gap-1.5 text-sky-200/60 text-[11px] mb-1">
+                  <GlassCard className="p-3 sm:p-4">
+                    <div className="flex items-center gap-1.5 text-sky-200/60 text-[10px] sm:text-[11px] mb-1">
                       <Eye className="w-3.5 h-3.5 text-sky-400" />
                       <span>{t.visibility}</span>
                     </div>
-                    <div className="text-sm font-semibold text-white">
+                    <div className="text-xs sm:text-sm font-semibold text-white">
                       {weather.current.vis_km ?? 10} km
                     </div>
-                    <span className="text-[10px] text-sky-200/50 mt-1 block">Atmosphere</span>
+                    <span className="text-[9.5px] sm:text-[10px] text-sky-200/50 mt-1 block">Atmosphere</span>
                   </GlassCard>
 
-                  <GlassCard className="p-4">
-                    <div className="flex items-center gap-1.5 text-sky-200/60 text-[11px] mb-1">
+                  <GlassCard className="p-3 sm:p-4">
+                    <div className="flex items-center gap-1.5 text-sky-200/60 text-[10px] sm:text-[11px] mb-1">
                       <Droplets className="w-3.5 h-3.5 text-blue-400" />
                       <span>{t.humidity}</span>
                     </div>
-                    <div className="text-sm font-semibold text-white">
+                    <div className="text-xs sm:text-sm font-semibold text-white">
                       {weather.current.humidity}%
                     </div>
-                    <span className="text-[10px] text-sky-200/50 mt-1 block">Moisture</span>
+                    <span className="text-[9.5px] sm:text-[10px] text-sky-200/50 mt-1 block">Moisture</span>
                   </GlassCard>
 
-                  <GlassCard className="p-4">
-                    <div className="flex items-center gap-1.5 text-sky-200/60 text-[11px] mb-1">
+                  <GlassCard className="p-3 sm:p-4">
+                    <div className="flex items-center gap-1.5 text-sky-200/60 text-[10px] sm:text-[11px] mb-1">
                       <Wind className="w-3.5 h-3.5 text-sky-300" />
                       <span>{t.wind}</span>
                     </div>
-                    <div className="text-sm font-semibold text-white">
+                    <div className="text-xs sm:text-sm font-semibold text-white">
                       {Math.round(weather.current.wind_kph)} km/h
                     </div>
-                    <span className="text-[10px] text-sky-200/50 mt-1 block">Speed</span>
+                    <span className="text-[9.5px] sm:text-[10px] text-sky-200/50 mt-1 block">Speed</span>
                   </GlassCard>
                 </div>
               </motion.div>
@@ -1385,7 +1570,7 @@ export default function App() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -12 }}
                 transition={{ duration: 0.22 }}
-                className="space-y-4"
+                className="space-y-3 sm:space-y-4"
               >
                 {/* Cities Hub Header */}
                 <div className="flex items-center justify-between px-1">
@@ -1398,7 +1583,7 @@ export default function App() {
                   </div>
                   <button
                     onClick={() => fetchWeather("New Delhi", false)}
-                    className="text-xs px-3 py-1 rounded-xl bg-white/[0.08] hover:bg-white/[0.14] border border-white/15 text-amber-300 font-medium transition-colors"
+                    className="text-xs px-2.5 sm:px-3 py-1 rounded-xl bg-white/[0.08] hover:bg-white/[0.14] border border-white/15 text-amber-300 font-medium transition-colors"
                   >
                     Reset New Delhi
                   </button>
@@ -1407,34 +1592,34 @@ export default function App() {
                 {/* GPS Location Instant Card */}
                 <GlassCard 
                   onClick={handleRequestLocation}
-                  className={`p-4 cursor-pointer transition-all hover:bg-white/[0.12] active:scale-[0.99] border ${
+                  className={`p-3.5 sm:p-4 cursor-pointer transition-all hover:bg-white/[0.12] active:scale-[0.99] border ${
                     isLiveLocation 
                       ? 'bg-emerald-400/15 border-emerald-400/40 shadow-[0_0_20px_rgba(52,211,153,0.15)]' 
                       : 'border-white/15'
                   }`}
                 >
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-10 h-10 rounded-2xl flex items-center justify-center ${
+                    <div className="flex items-center gap-2.5 sm:gap-3">
+                      <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl flex items-center justify-center ${
                         isLiveLocation ? 'bg-emerald-400/25 text-emerald-300' : 'bg-white/10 text-sky-300'
                       }`}>
-                        <LocateFixed className={`w-5 h-5 ${isLocating ? 'animate-spin text-amber-400' : ''}`} />
+                        <LocateFixed className={`w-4 h-4 sm:w-5 sm:h-5 ${isLocating ? 'animate-spin text-amber-400' : ''}`} />
                       </div>
                       <div>
                         <div className="flex items-center gap-1.5">
-                          <h4 className="font-bold text-white text-sm">
+                          <h4 className="font-bold text-white text-xs sm:text-sm">
                             {isLiveLocation ? "Live Device GPS Active" : "Detect Current GPS Location"}
                           </h4>
-                          {isLiveLocation && <Check className="w-4 h-4 text-emerald-400" />}
+                          {isLiveLocation && <Check className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-400" />}
                         </div>
-                        <p className="text-xs text-sky-200/60">
+                        <p className="text-[11px] sm:text-xs text-sky-200/60">
                           {isLiveLocation ? `Active at ${weather.location.name}` : "Tap to automatically detect your real-time coordinates"}
                         </p>
                       </div>
                     </div>
 
                     <button
-                      className={`px-3 py-1.5 rounded-xl text-xs font-semibold ${
+                      className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg sm:rounded-xl text-[11px] sm:text-xs font-semibold ${
                         isLiveLocation 
                           ? 'bg-emerald-400 text-slate-950 shadow-md' 
                           : 'bg-white/15 hover:bg-white/25 text-white'
@@ -1446,13 +1631,13 @@ export default function App() {
                 </GlassCard>
 
                 {/* Indian Metros Grid */}
-                <div className="space-y-2">
+                <div className="space-y-1.5 sm:space-y-2">
                   <div className="flex items-center justify-between px-1 text-xs text-sky-200/70">
                     <span className="font-semibold text-white">Popular Indian Cities</span>
-                    <span className="text-[11px] text-sky-200/50">One-tap weather switch</span>
+                    <span className="text-[10px] sm:text-[11px] text-sky-200/50">One-tap weather switch</span>
                   </div>
 
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-2.5">
                     {INDIAN_METROS.map((metro) => {
                       const isSelected = !isLiveLocation && weather.location.name.toLowerCase() === metro.name.toLowerCase();
                       return (
@@ -1462,7 +1647,7 @@ export default function App() {
                             fetchWeather(metro.query, false);
                             setActiveTab("today");
                           }}
-                          className={`p-3.5 rounded-2xl text-left transition-all active:scale-95 border flex items-center justify-between group ${
+                          className={`p-2.5 sm:p-3.5 rounded-xl sm:rounded-2xl text-left transition-all active:scale-95 border flex items-center justify-between group ${
                             isSelected
                               ? "bg-amber-400/20 border-amber-400/50 shadow-[0_0_15px_rgba(251,191,36,0.15)]"
                               : "bg-white/[0.07] hover:bg-white/[0.12] border-white/10"
@@ -1475,10 +1660,10 @@ export default function App() {
                               </p>
                               {isSelected && <Check className="w-3.5 h-3.5 text-amber-400 shrink-0" />}
                             </div>
-                            <p className="text-[10px] text-sky-200/50 truncate">India</p>
+                            <p className="text-[9.5px] sm:text-[10px] text-sky-200/50 truncate">India</p>
                           </div>
 
-                          <ChevronRight className={`w-4 h-4 transition-transform ${isSelected ? 'text-amber-400' : 'text-white/30 group-hover:text-white group-hover:translate-x-0.5'}`} />
+                          <ChevronRight className={`w-3.5 h-3.5 sm:w-4 sm:h-4 transition-transform ${isSelected ? 'text-amber-400' : 'text-white/30 group-hover:text-white group-hover:translate-x-0.5'}`} />
                         </button>
                       );
                     })}
@@ -1486,11 +1671,36 @@ export default function App() {
                 </div>
               </motion.div>
             )}
+
+            {/* ===================== SECTION 5: SETTINGS PAGE ===================== */}
+            {activeTab === "settings" && (
+              <SettingsPage
+                currentLanguage={language}
+                onSelectLanguage={handleSelectLanguage}
+                unit={unit}
+                onToggleUnit={setUnit}
+                skyTheme={skyTheme}
+                onToggleTheme={setSkyTheme}
+                t={t}
+                defaultCity={customDisplayName || weather?.location.name || "New Delhi"}
+                onSelectDefaultCity={(cityName) => {
+                  fetchWeather(cityName, false);
+                  setActiveTab("today");
+                }}
+                onResetAll={() => {
+                  setUnit('C');
+                  setSkyTheme('blue-sky');
+                  handleSelectLanguage('en');
+                  fetchWeather('New Delhi', false);
+                  showToast("Preferences reset to defaults");
+                }}
+              />
+            )}
           </AnimatePresence>
         )}
 
         {/* Minimal Clean Footer */}
-        <footer className="pt-4 pb-6 text-center text-[11px] text-sky-200/40">
+        <footer className="pt-2 sm:pt-4 pb-2 sm:pb-4 text-center text-[10px] sm:text-[11px] text-sky-200/40">
           <p>{t.footerNote}</p>
         </footer>
       </main>
@@ -1500,6 +1710,7 @@ export default function App() {
         activeTab={activeTab} 
         onChangeTab={setActiveTab} 
         language={language} 
+        isNight={!isBlueSky}
       />
 
       {/* Settings & Language Customization Modal */}

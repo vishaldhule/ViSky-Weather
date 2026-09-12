@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Smartphone, Download, Share2, PlusSquare, X, CheckCircle2 } from 'lucide-react';
 import { usePWAInstall } from '../hooks/usePWAInstall';
+import { AppLogoIcon } from './AppLogo';
 
 interface PWAInstallButtonProps {
   variant?: 'header' | 'floating' | 'banner';
@@ -33,9 +34,7 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({ variant = 'h
       <>
         <div id="pwa-mobile-banner" className="relative mx-3 mb-4 p-3.5 rounded-2xl bg-gradient-to-r from-blue-600/30 via-cyan-500/20 to-indigo-600/30 border border-cyan-400/30 backdrop-blur-xl flex items-center justify-between gap-3 shadow-lg shadow-blue-950/40">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="w-10 h-10 rounded-xl bg-cyan-500/20 border border-cyan-400/40 flex items-center justify-center shrink-0 text-cyan-300">
-              <Smartphone className="w-5 h-5" />
-            </div>
+            <AppLogoIcon size={38} className="shrink-0" />
             <div className="min-w-0">
               <div className="text-xs font-bold text-white tracking-wide truncate">Get Indra Mobile App</div>
               <div className="text-[11px] text-white/60 truncate">Add to Home Screen for full offline app experience</div>
@@ -56,8 +55,8 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({ variant = 'h
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in">
             <div className="w-full max-w-sm rounded-3xl bg-slate-900/95 border border-white/15 p-6 shadow-2xl text-white">
               <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <Smartphone className="w-5 h-5 text-cyan-400" />
+                <div className="flex items-center gap-2.5">
+                  <AppLogoIcon size={28} />
                   <h3 className="font-bold text-base">Install Indra App</h3>
                 </div>
                 <button 
@@ -137,8 +136,8 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({ variant = 'h
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
           <div className="w-full max-w-sm rounded-3xl bg-slate-900/95 border border-white/15 p-6 shadow-2xl text-white">
             <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <Smartphone className="w-5 h-5 text-cyan-400" />
+              <div className="flex items-center gap-2.5">
+                <AppLogoIcon size={28} />
                 <h3 className="font-bold text-base">Install Indra App</h3>
               </div>
               <button 

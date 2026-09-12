@@ -52,18 +52,25 @@ export const D3ClimateChart: React.FC<D3ClimateChartProps> = ({
   const [containerWidth, setContainerWidth] = useState<number>(600);
   const [activeItem, setActiveItem] = useState<ActiveTooltipData | null>(null);
 
-  // ResizeObserver for fluid responsive SVG sizing
+  // ResizeObserver for fluid responsive SVG sizing with rAF throttling
   useEffect(() => {
     if (!containerRef.current) return;
+    let rAF: number;
     const observer = new ResizeObserver((entries) => {
       if (!entries || entries.length === 0) return;
       const width = entries[0].contentRect.width;
       if (width > 0) {
-        setContainerWidth(width);
+        cancelAnimationFrame(rAF);
+        rAF = requestAnimationFrame(() => {
+          setContainerWidth(width);
+        });
       }
     });
     observer.observe(containerRef.current);
-    return () => observer.disconnect();
+    return () => {
+      cancelAnimationFrame(rAF);
+      observer.disconnect();
+    };
   }, []);
 
   const height = 230;
@@ -188,22 +195,6 @@ export const D3ClimateChart: React.FC<D3ClimateChartProps> = ({
       .attr('stop-color', '#0284c7')
       .attr('stop-opacity', 0.15);
 
-    // Glow filter
-    const filter = defs
-      .append('filter')
-      .attr('id', 'd3-glow')
-      .attr('x', '-20%')
-      .attr('y', '-20%')
-      .attr('width', '140%')
-      .attr('height', '140%');
-    filter
-      .append('feGaussianBlur')
-      .attr('stdDeviation', '2.5')
-      .attr('result', 'coloredBlur');
-    const feMerge = filter.append('feMerge');
-    feMerge.append('feMergeNode').attr('in', 'coloredBlur');
-    feMerge.append('feMergeNode').attr('in', 'SourceGraphic');
-
     const g = svg
       .append('g')
       .attr('transform', `translate(${margin.left},${margin.top})`);
@@ -263,8 +254,7 @@ export const D3ClimateChart: React.FC<D3ClimateChartProps> = ({
       .attr('d', lineGenerator)
       .attr('fill', 'none')
       .attr('stroke', '#fbbf24')
-      .attr('stroke-width', 3)
-      .attr('filter', 'url(#d3-glow)');
+      .attr('stroke-width', 2.5);
 
     // 7. Node Dots for each data point
     g.selectAll<SVGCircleElement, ClimateChartPoint>('.temp-node')
@@ -464,7 +454,7 @@ export const D3ClimateChart: React.FC<D3ClimateChartProps> = ({
             top: `${Math.max(10, activeItem.y - 120)}px`,
           }}
         >
-          <div className="bg-[#0f172a]/95 backdrop-blur-xl border border-white/20 rounded-2xl p-3 shadow-[0_12px_30px_rgba(0,0,0,0.7)] text-white text-xs min-w-[210px]">
+          <div className="bg-[#0f172a] border border-white/20 rounded-2xl p-3 shadow-[0_12px_30px_rgba(0,0,0,0.8)] text-white text-xs min-w-[210px]">
             <div className="flex items-center justify-between border-b border-white/10 pb-1.5 mb-2">
               <div>
                 <span className="font-black text-sm text-amber-300">

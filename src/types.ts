@@ -10,6 +10,12 @@ export interface WeatherData {
   current: {
     temp_c: number;
     temp_f?: number;
+    feelslike_c?: number;
+    feelslike_f?: number;
+    vis_km?: number;
+    vis_miles?: number;
+    pressure_mb?: number;
+    pressure_in?: number;
     condition: {
       text: string;
       icon: string;
@@ -92,7 +98,7 @@ export interface LocationSuggestion {
   url: string;
 }
 
-export type MobileTab = 'today' | 'forecast' | 'intel' | 'cities';
+export type MobileTab = 'today' | 'forecast' | 'intel' | 'cities' | 'settings';
 
 export type ChartViewMode = 'hourly' | 'daily' | 'monthly' | 'seasonal';
 

@@ -185,13 +185,12 @@ export const TemperatureChart: React.FC<TemperatureChartProps> = ({
               </defs>
               <Tooltip 
                 contentStyle={{ 
-                  backgroundColor: 'rgba(17, 11, 51, 0.95)', 
-                  border: '1px solid rgba(255, 255, 255, 0.15)',
-                  borderRadius: '1rem',
+                  backgroundColor: '#0c1a38', 
+                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                  borderRadius: '0.75rem',
                   color: '#fff',
                   fontSize: '12px',
-                  backdropFilter: 'blur(16px)',
-                  boxShadow: '0 10px 25px rgba(0,0,0,0.5)'
+                  boxShadow: '0 8px 24px rgba(0,0,0,0.6)'
                 }}
                 itemStyle={{ fontSize: '11px', fontWeight: 'bold' }}
                 cursor={{ stroke: 'rgba(255, 255, 255, 0.15)', strokeWidth: 1.5 }}
@@ -219,9 +218,10 @@ export const TemperatureChart: React.FC<TemperatureChartProps> = ({
                 dataKey="temp" 
                 name={`Temp (°${unit})`}
                 stroke="#facd15" 
-                strokeWidth={3}
+                strokeWidth={2.5}
                 fillOpacity={1} 
                 fill="url(#colorTemp)" 
+                isAnimationActive={false}
               />
               <Bar 
                 yAxisId="right"
@@ -231,6 +231,7 @@ export const TemperatureChart: React.FC<TemperatureChartProps> = ({
                 radius={[4, 4, 0, 0]}
                 opacity={0.35}
                 barSize={12}
+                isAnimationActive={false}
               />
             </ComposedChart>
           </ResponsiveContainer>

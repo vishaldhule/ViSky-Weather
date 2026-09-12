@@ -2,14 +2,36 @@ import express from "express";
 import http from "http";
 import path from "path";
 import { createServer as createViteServer } from "vite";
+import { GoogleGenAI } from "@google/genai";
 import "dotenv/config";
 
 const NEWS_API_KEY = process.env.NEWS_API_KEY || "1b085171d35e4331828c4890609c5b3a";
+
+let aiClient: GoogleGenAI | null = null;
+function getGenAI(): GoogleGenAI {
+  if (!aiClient) {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      throw new Error("GEMINI_API_KEY is not configured in environment. Please add it in Settings > Secrets.");
+    }
+    aiClient = new GoogleGenAI({
+      apiKey,
+      httpOptions: {
+        headers: {
+          "User-Agent": "aistudio-build",
+        },
+      },
+    });
+  }
+  return aiClient;
+}
 
 async function startServer() {
   const app = express();
   const server = http.createServer(app);
   const PORT = 3000;
+
+  app.use(express.json());
 
   // Proxy NewsAPI requests to bypass CORS/Browser restrictions on Developer plan
   app.get("/api/news", async (req, res) => {

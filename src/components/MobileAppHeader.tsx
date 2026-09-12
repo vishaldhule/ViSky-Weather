@@ -43,7 +43,7 @@ export const MobileAppHeader: React.FC<MobileAppHeaderProps> = ({
   return (
     <header 
       id="mobile-app-header"
-      className="sticky top-0 z-30 bg-[#110B33]/85 backdrop-blur-2xl border-b border-white/10 px-3 py-2.5 md:py-3 transition-all"
+      className="sticky top-0 z-30 bg-[#110B33]/95 backdrop-blur-md border-b border-white/10 px-3 py-2.5 md:py-3 transition-colors"
     >
       <div className="max-w-6xl mx-auto flex items-center justify-between gap-2">
         {/* Left: Brand / Current Location badge */}

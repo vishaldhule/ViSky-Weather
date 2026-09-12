@@ -129,28 +129,28 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <Sun className="w-3.5 h-3.5 text-sky-400" />
                   <span>{t.themeLabel}</span>
                 </div>
-                <div className="flex bg-black/20 p-1 rounded-xl border border-white/10">
+                <div className="flex bg-black/25 p-1 rounded-xl border border-white/10">
                   <button
                     onClick={() => onToggleTheme('blue-sky')}
-                    className={`flex-1 py-1 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1 ${
+                    className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
                       skyTheme === 'blue-sky'
-                        ? 'bg-sky-400/25 text-sky-200 border border-sky-400/40 shadow-sm'
+                        ? 'bg-amber-400/25 text-amber-200 border border-amber-300/50 shadow-sm'
                         : 'text-white/60 hover:text-white'
                     }`}
                   >
-                    <Sun className="w-3 h-3 text-amber-300" />
-                    <span>{t.blueSky}</span>
+                    <Sun className="w-3.5 h-3.5 text-amber-300" />
+                    <span>Morning Sky</span>
                   </button>
                   <button
                     onClick={() => onToggleTheme('deep-indigo')}
-                    className={`flex-1 py-1 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1 ${
+                    className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
                       skyTheme === 'deep-indigo'
-                        ? 'bg-indigo-400/25 text-indigo-200 border border-indigo-400/40 shadow-sm'
+                        ? 'bg-cyan-500/25 text-cyan-300 border border-cyan-400/50 shadow-sm'
                         : 'text-white/60 hover:text-white'
                     }`}
                   >
-                    <Moon className="w-3 h-3 text-indigo-300" />
-                    <span>{t.midnight}</span>
+                    <Moon className="w-3.5 h-3.5 text-cyan-300" />
+                    <span>Dark Neon</span>
                   </button>
                 </div>
               </div>

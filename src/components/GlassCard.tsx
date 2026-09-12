@@ -16,8 +16,9 @@ export const GlassCard: React.FC<GlassCardProps> = ({
   <div 
     id={id}
     onClick={onClick}
-    className={`backdrop-blur-2xl bg-white/[0.07] border border-white/15 rounded-3xl p-5 md:p-6 shadow-[0_12px_40px_rgba(2,12,38,0.35)] transition-all ${className}`}
+    className={`backdrop-blur-md bg-[#091b3b]/85 sm:bg-[#0c224a]/75 border border-white/[0.14] rounded-2xl sm:rounded-3xl p-4 sm:p-5 md:p-6 shadow-[0_8px_32px_rgba(0,0,0,0.35)] transition-colors duration-200 ${className}`}
   >
     {children}
   </div>
 );
+

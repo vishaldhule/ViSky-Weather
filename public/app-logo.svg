@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none">
+  <defs>
+    <linearGradient id="indra-icon-bg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#00a3ff"/>
+      <stop offset="50%" stop-color="#0077f7"/>
+      <stop offset="100%" stop-color="#0055db"/>
+    </linearGradient>
+    <linearGradient id="indra-sun" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffde59"/>
+      <stop offset="100%" stop-color="#ff9100"/>
+    </linearGradient>
+    <linearGradient id="indra-lightning" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffea79"/>
+      <stop offset="100%" stop-color="#ffb703"/>
+    </linearGradient>
+    <filter id="indra-shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#002060" flood-opacity="0.35"/>
+    </filter>
+    <filter id="indra-cloud-shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#002b66" flood-opacity="0.25"/>
+    </filter>
+  </defs>
+
+  <!-- Squircle Base with Soft Shadow -->
+  <rect x="4" y="4" width="92" height="92" rx="22" fill="url(#indra-icon-bg)" filter="url(#indra-shadow)"/>
+  
+  <!-- Subtle Top Highlight -->
+  <rect x="6" y="6" width="88" height="44" rx="20" fill="white" fill-opacity="0.12" />
+
+  <!-- Sun (behind cloud, top right) -->
+  <circle cx="66" cy="38" r="15" fill="url(#indra-sun)" />
+
+  <!-- Cloud -->
+  <g filter="url(#indra-cloud-shadow)">
+    <rect x="24" y="46" width="52" height="22" rx="11" fill="#FFFFFF"/>
+    <circle cx="36" cy="50" r="13" fill="#FFFFFF"/>
+    <circle cx="50" cy="42" r="17" fill="#FFFFFF"/>
+    <circle cx="64" cy="51" r="12" fill="#FFFFFF"/>
+  </g>
+
+  <!-- Lightning Bolt -->
+  <path d="M49 57 L44 68 L50 68 L46 81 L57 66 L51 66 Z" 
+        fill="url(#indra-lightning)" 
+        stroke="#e69500" 
+        stroke-width="0.75" 
+        stroke-linejoin="round"/>
+</svg>
