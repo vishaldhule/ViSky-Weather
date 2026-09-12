@@ -44,8 +44,9 @@ import { PWAInstallButton } from "./components/PWAInstallButton";
 import { OfflineIndicator } from "./components/OfflineIndicator";
 import { SettingsModal } from "./components/SettingsModal";
 import { MobileBottomNav } from "./components/MobileBottomNav";
+import { WeatherSimpleSummary } from "./components/WeatherSimpleSummary";
 import { INDIAN_METROS } from "./utils/locationHelper";
-import { TRANSLATIONS, LanguageCode, TranslationStrings } from "./utils/translations";
+import { TRANSLATIONS, LanguageCode, TranslationStrings, AVAILABLE_LANGUAGES } from "./utils/translations";
 import {
   searchLocationsUniversal,
   resolveQueryToCoordinates,
@@ -1060,6 +1061,17 @@ export default function App() {
                     </div>
                   </GlassCard>
                 </div>
+
+                {/* Plain-Language Mini Weather Summary (Zero Jargon • Easy to Understand) */}
+                <WeatherSimpleSummary 
+                  weather={weather} 
+                  activeLanguage={language} 
+                  onLanguageChange={(code) => {
+                    if (AVAILABLE_LANGUAGES.some(l => l.code === code)) {
+                      handleSelectLanguage(code as LanguageCode);
+                    }
+                  }}
+                />
               </motion.div>
             )}
 
