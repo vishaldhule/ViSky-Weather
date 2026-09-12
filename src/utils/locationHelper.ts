@@ -13,9 +13,10 @@ export interface DetectedLocationResult {
 
 export const INDIAN_METROS = [
   { name: "New Delhi", region: "Delhi", query: "New Delhi" },
+  { name: "Sambhaji Nagar", region: "Maharashtra", query: "19.8773,75.3390" },
   { name: "Mumbai", region: "Maharashtra", query: "Mumbai" },
-  { name: "Bengaluru", region: "Karnataka", query: "Bengaluru" },
   { name: "Pune", region: "Maharashtra", query: "Pune" },
+  { name: "Bengaluru", region: "Karnataka", query: "Bengaluru" },
   { name: "Hyderabad", region: "Telangana", query: "Hyderabad" },
   { name: "Kolkata", region: "West Bengal", query: "Kolkata" },
   { name: "Chennai", region: "Tamil Nadu", query: "Chennai" },

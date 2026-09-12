@@ -1,0 +1,1434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#0b132b">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="description" content="Production-ready standalone weather app powered by Open-Meteo API with built-in client intelligence engine.">
+  <title>ViSky Weather • Standalone Mobile Edition</title>
+  <style>
+    /* ==========================================================================
+       CSS RESET & MOBILE VIEWPORT FOUNDATION
+       ========================================================================== */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    :root {
+      --bg-dark: #080d1a;
+      --bg-surface: #10192e;
+      --bg-card: rgba(23, 34, 61, 0.75);
+      --bg-card-hover: rgba(30, 45, 80, 0.85);
+      --border-subtle: rgba(255, 255, 255, 0.1);
+      --border-focus: #38bdf8;
+      --text-primary: #f8fafc;
+      --text-secondary: #94a3b8;
+      --text-muted: #64748b;
+      --accent-sky: #38bdf8;
+      --accent-amber: #fbbf24;
+      --accent-emerald: #34d399;
+      --accent-rose: #f43f5e;
+      --font-stack: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      --safe-top: env(safe-area-inset-top, 0px);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      background-color: var(--bg-dark);
+      color: var(--text-primary);
+      font-family: var(--font-stack);
+      font-size: 16px;
+      line-height: 1.5;
+      overflow-x: hidden;
+      touch-action: manipulation;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Ambient Background Glow */
+    body {
+      background: radial-gradient(circle at 50% 0%, #172554 0%, #080d1a 65%, #030712 100%);
+      background-attachment: fixed;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+      padding-top: var(--safe-top);
+      padding-bottom: calc(var(--safe-bottom) + 16px);
+    }
+
+    /* ==========================================================================
+       LAYOUT CONTAINERS
+       ========================================================================== */
+    .app-container {
+      width: 100%;
+      max-width: 520px;
+      margin: 0 auto;
+      padding: 16px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      flex: 1;
+    }
+
+    /* Header Bar */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .brand-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .brand-icon {
+      width: 38px;
+      height: 38px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.25), rgba(251, 191, 36, 0.2));
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--accent-amber);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+
+    .brand-title {
+      font-size: 1.15rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: #ffffff;
+      display: flex;
+      flex-direction: column;
+      line-height: 1.2;
+    }
+
+    .brand-subtitle {
+      font-size: 0.68rem;
+      font-weight: 600;
+      color: var(--accent-sky);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .icon-btn {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-primary);
+      width: 38px;
+      height: 38px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .icon-btn:hover {
+      background: rgba(255, 255, 255, 0.15);
+      transform: translateY(-1px);
+    }
+
+    .icon-btn:active {
+      transform: scale(0.95);
+    }
+
+    .unit-pill {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid var(--border-subtle);
+      color: var(--accent-amber);
+      font-size: 0.8rem;
+      font-weight: 700;
+      padding: 0 12px;
+      height: 38px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .unit-pill:active {
+      transform: scale(0.95);
+    }
+
+    /* Offline Alert Banner */
+    #offline-banner {
+      display: none;
+      background: rgba(244, 63, 94, 0.2);
+      border: 1px solid rgba(244, 63, 94, 0.4);
+      color: #fecdd3;
+      padding: 10px 14px;
+      border-radius: 14px;
+      font-size: 0.82rem;
+      font-weight: 500;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* ==========================================================================
+       SEARCH & QUICK SELECTORS
+       ========================================================================== */
+    .search-card {
+      position: relative;
+      display: flex;
+      gap: 8px;
+    }
+
+    .search-input-wrapper {
+      position: relative;
+      flex: 1;
+    }
+
+    .search-input-wrapper svg {
+      position: absolute;
+      left: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-muted);
+      pointer-events: none;
+      width: 18px;
+      height: 18px;
+    }
+
+    .search-input {
+      width: 100%;
+      height: 46px;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--border-subtle);
+      border-radius: 14px;
+      padding: 0 16px 0 42px;
+      color: #ffffff;
+      font-size: 0.95rem;
+      font-family: inherit;
+      outline: none;
+      transition: all 0.2s ease;
+    }
+
+    .search-input:focus {
+      border-color: var(--border-focus);
+      background: rgba(255, 255, 255, 0.1);
+      box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2);
+    }
+
+    .search-input::placeholder {
+      color: var(--text-muted);
+    }
+
+    .submit-btn {
+      height: 46px;
+      padding: 0 18px;
+      border-radius: 14px;
+      background: var(--accent-sky);
+      border: none;
+      color: #041226;
+      font-weight: 700;
+      font-size: 0.9rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+    }
+
+    .submit-btn:active {
+      transform: scale(0.96);
+      filter: brightness(0.95);
+    }
+
+    /* City Quick Chips */
+    .chip-scroll {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      overflow-x: auto;
+      padding-bottom: 2px;
+      scrollbar-width: none;
+    }
+
+    .chip-scroll::-webkit-scrollbar {
+      display: none;
+    }
+
+    .city-chip {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      color: var(--text-secondary);
+      font-size: 0.78rem;
+      font-weight: 600;
+      padding: 6px 13px;
+      border-radius: 12px;
+      white-space: nowrap;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .city-chip:hover {
+      color: #ffffff;
+      background: rgba(255, 255, 255, 0.12);
+    }
+
+    .city-chip.active {
+      background: rgba(56, 189, 248, 0.2);
+      border-color: rgba(56, 189, 248, 0.45);
+      color: var(--accent-sky);
+      font-weight: 700;
+    }
+
+    /* ==========================================================================
+       WEATHER HERO DISPLAY CARD
+       ========================================================================== */
+    .weather-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 24px;
+      padding: 24px 20px;
+      position: relative;
+      overflow: hidden;
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.4);
+    }
+
+    .weather-card::after {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.25), transparent);
+    }
+
+    .location-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .location-name {
+      font-size: 1.4rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .location-details {
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      margin-top: 2px;
+    }
+
+    .live-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(52, 211, 153, 0.15);
+      border: 1px solid rgba(52, 211, 153, 0.35);
+      color: var(--accent-emerald);
+      font-size: 0.68rem;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 20px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .pulse-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent-emerald);
+      box-shadow: 0 0 8px var(--accent-emerald);
+      animation: pulse 1.8s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.4); opacity: 0.4; }
+    }
+
+    /* Main Temp Display */
+    .hero-metrics-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 10px 0;
+    }
+
+    .temp-large {
+      font-size: 4.6rem;
+      font-weight: 200;
+      line-height: 1;
+      letter-spacing: -0.04em;
+      color: #ffffff;
+      text-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+    }
+
+    .temp-unit {
+      font-size: 2.2rem;
+      font-weight: 400;
+      color: var(--accent-amber);
+      vertical-align: super;
+      margin-left: 2px;
+    }
+
+    .condition-icon-box {
+      width: 96px;
+      height: 96px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      filter: drop-shadow(0 8px 16px rgba(56, 189, 248, 0.3));
+    }
+
+    .condition-desc {
+      font-size: 1.15rem;
+      font-weight: 600;
+      color: #ffffff;
+      margin-bottom: 2px;
+    }
+
+    .meta-time {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+    }
+
+    /* Secondary Telemetry Grid */
+    .telemetry-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-top: 18px;
+      padding-top: 16px;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .telemetry-item {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .telemetry-label {
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .telemetry-val {
+      font-size: 1rem;
+      font-weight: 700;
+      color: #ffffff;
+    }
+
+    /* ==========================================================================
+       BUILT-IN INTELLIGENCE ENGINE (RULE-BASED ADVICE)
+       ========================================================================== */
+    .intel-container {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .intel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 4px;
+    }
+
+    .intel-title {
+      font-size: 0.88rem;
+      font-weight: 700;
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .engine-tag {
+      background: rgba(251, 191, 36, 0.15);
+      border: 1px solid rgba(251, 191, 36, 0.35);
+      color: var(--accent-amber);
+      font-size: 0.65rem;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 8px;
+    }
+
+    .intel-cards-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+    }
+
+    .insight-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 18px;
+      padding: 16px;
+      display: flex;
+      gap: 14px;
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      transition: transform 0.2s ease;
+    }
+
+    .insight-card:hover {
+      border-color: rgba(255, 255, 255, 0.18);
+    }
+
+    .insight-icon-bubble {
+      width: 44px;
+      height: 44px;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .bubble-outfit {
+      background: rgba(56, 189, 248, 0.15);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      color: var(--accent-sky);
+    }
+
+    .bubble-travel {
+      background: rgba(251, 191, 36, 0.15);
+      border: 1px solid rgba(251, 191, 36, 0.3);
+      color: var(--accent-amber);
+    }
+
+    .bubble-health {
+      background: rgba(52, 211, 153, 0.15);
+      border: 1px solid rgba(52, 211, 153, 0.3);
+      color: var(--accent-emerald);
+    }
+
+    .insight-content {
+      flex: 1;
+    }
+
+    .insight-heading {
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: #ffffff;
+      margin-bottom: 4px;
+    }
+
+    .insight-text {
+      font-size: 0.82rem;
+      color: var(--text-secondary);
+      line-height: 1.45;
+    }
+
+    .tag-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 8px;
+    }
+
+    .micro-pill {
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text-primary);
+    }
+
+    /* ==========================================================================
+       UI STATES: LOADING, ERROR, SKELETON
+       ========================================================================== */
+    .loader-overlay {
+      display: none;
+      position: absolute;
+      inset: 0;
+      background: rgba(8, 13, 26, 0.75);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      z-index: 40;
+      border-radius: 24px;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .spinner {
+      width: 36px;
+      height: 36px;
+      border: 3px solid rgba(255, 255, 255, 0.15);
+      border-top-color: var(--accent-sky);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .error-box {
+      display: none;
+      background: rgba(244, 63, 94, 0.15);
+      border: 1px solid rgba(244, 63, 94, 0.35);
+      border-radius: 18px;
+      padding: 18px;
+      text-align: center;
+      gap: 10px;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .error-title {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: #fecdd3;
+    }
+
+    .error-desc {
+      font-size: 0.82rem;
+      color: #fda4af;
+      max-width: 320px;
+    }
+
+    .retry-btn {
+      background: #f43f5e;
+      color: #ffffff;
+      border: none;
+      padding: 8px 18px;
+      border-radius: 10px;
+      font-size: 0.82rem;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 4px;
+    }
+
+    /* Footer Note */
+    footer {
+      text-align: center;
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      margin-top: auto;
+      padding-top: 12px;
+    }
+
+    footer a {
+      color: var(--accent-sky);
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="app-container">
+    <!-- TOP HEADER -->
+    <header>
+      <div class="brand-group">
+        <div class="brand-icon">
+          <!-- Inline Weather Spark SVG -->
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/>
+          </svg>
+        </div>
+        <div class="brand-title">
+          <span>ViSky Mobile</span>
+          <span class="brand-subtitle">Open-Meteo Core</span>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <!-- Geolocation Button -->
+        <button id="btn-gps" class="icon-btn" title="Use Live GPS Coordinates" aria-label="Use Current GPS">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="2" y1="12" x2="5" y2="12"></line>
+            <line x1="19" y1="12" x2="22" y2="12"></line>
+            <line x1="12" y1="2" x2="12" y2="5"></line>
+            <line x1="12" y1="19" x2="12" y2="22"></line>
+            <circle cx="12" cy="12" r="7"></circle>
+            <circle cx="12" cy="12" r="3"></circle>
+          </svg>
+        </button>
+
+        <!-- Unit Switcher -->
+        <button id="btn-unit" class="unit-pill" title="Toggle °C / °F">°C</button>
+
+        <!-- Refresh Button -->
+        <button id="btn-refresh" class="icon-btn" title="Refresh atmospheric data" aria-label="Refresh Data">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+            <path d="M3 3v5h5"/>
+            <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/>
+            <path d="M16 21h5v-5"/>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- OFFLINE STATUS ALERT -->
+    <div id="offline-banner">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="1" y1="1" x2="23" y2="23"></line>
+        <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"></path>
+        <path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"></path>
+        <path d="M10.71 5.05A16 16 0 0 1 22.58 9"></path>
+        <path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"></path>
+        <path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path>
+        <line x1="12" y1="20" x2="12.01" y2="20"></line>
+      </svg>
+      <span>You are offline. Showing latest cached atmospheric data.</span>
+    </div>
+
+    <!-- SEARCH BAR -->
+    <div class="search-card">
+      <div class="search-input-wrapper">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+        <input 
+          id="city-input" 
+          class="search-input" 
+          type="text" 
+          placeholder="Search city (e.g., Tokyo, Paris, Mumbai)..." 
+          autocomplete="off"
+          spellcheck="false"
+        />
+      </div>
+      <button id="btn-search" class="submit-btn">Find</button>
+    </div>
+
+    <!-- QUICK PRESET CHIPS -->
+    <div class="chip-scroll" id="chip-container">
+      <button class="city-chip active" data-city="London">London</button>
+      <button class="city-chip" data-city="New Delhi">New Delhi</button>
+      <button class="city-chip" data-city="Tokyo">Tokyo</button>
+      <button class="city-chip" data-city="New York">New York</button>
+      <button class="city-chip" data-city="Paris">Paris</button>
+      <button class="city-chip" data-city="Dubai">Dubai</button>
+      <button class="city-chip" data-city="Sydney">Sydney</button>
+    </div>
+
+    <!-- ERROR CONTAINER -->
+    <div id="error-container" class="error-box">
+      <div class="error-title" id="error-title">Location Not Found</div>
+      <div class="error-desc" id="error-desc">Please verify the spelling or check your internet connection.</div>
+      <button id="btn-retry" class="retry-btn">Try Again</button>
+    </div>
+
+    <!-- MAIN WEATHER HERO CARD -->
+    <div class="weather-card" id="weather-display">
+      <!-- Loading Overlay -->
+      <div id="loading-overlay" class="loader-overlay">
+        <div class="spinner"></div>
+        <span style="font-size:0.8rem; font-weight:600; color:#e2e8f0;">Syncing Open-Meteo Data...</span>
+      </div>
+
+      <!-- Top Row: Location & Live Tag -->
+      <div class="location-row">
+        <div>
+          <div class="location-name">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent-amber)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/>
+              <circle cx="12" cy="10" r="3"/>
+            </svg>
+            <span id="ui-city">London</span>
+          </div>
+          <div class="location-details" id="ui-coords">United Kingdom • 51.51°N, 0.13°W</div>
+        </div>
+        <div class="live-badge">
+          <span class="pulse-dot"></span>
+          <span>Open-Meteo</span>
+        </div>
+      </div>
+
+      <!-- Centerpiece: Temp & Dynamic Condition -->
+      <div class="hero-metrics-row">
+        <div>
+          <div class="temp-large">
+            <span id="ui-temp">16</span><span class="temp-unit" id="ui-unit">°C</span>
+          </div>
+          <div class="condition-desc" id="ui-condition">Partly Cloudy</div>
+          <div class="meta-time" id="ui-timestamp">Updated real-time</div>
+        </div>
+
+        <div class="condition-icon-box" id="ui-icon">
+          <!-- Dynamic SVG inserted by script -->
+        </div>
+      </div>
+
+      <!-- Bottom Atmospheric Bar -->
+      <div class="telemetry-grid">
+        <div class="telemetry-item">
+          <div class="telemetry-label">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.7 7.7a2.5 2.5 0 1 1 1.8 4.3H2"/><path d="M9.6 4.6A2 2 0 1 1 11 8H2"/><path d="M12.6 19.4A2 2 0 1 0 14 16H2"/></svg>
+            <span>Wind</span>
+          </div>
+          <div class="telemetry-val" id="ui-wind">14 km/h</div>
+        </div>
+
+        <div class="telemetry-item">
+          <div class="telemetry-label">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m16.2 7.8-2 6.3-6.4 2.1 2-6.3z"/></svg>
+            <span>Bearing</span>
+          </div>
+          <div class="telemetry-val" id="ui-wind-dir">SW (220°)</div>
+        </div>
+
+        <div class="telemetry-item">
+          <div class="telemetry-label">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
+            <span>Day / Night</span>
+          </div>
+          <div class="telemetry-val" id="ui-daynight">Daylight</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- BUILT-IN INTELLIGENCE ENGINE (RULE-BASED INSIGHTS) -->
+    <div class="intel-container">
+      <div class="intel-header">
+        <div class="intel-title">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent-amber)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+          </svg>
+          <span>Real-Time Weather Intelligence</span>
+        </div>
+        <span class="engine-tag">Rule Engine v3.2</span>
+      </div>
+
+      <div class="intel-cards-grid">
+        <!-- Card 1: Wardrobe / Outfit -->
+        <div class="insight-card">
+          <div class="insight-icon-bubble bubble-outfit">
+            <!-- Outfit Coat SVG -->
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.47a1 1 0 0 0 .99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.47a2 2 0 0 0-1.34-2.23z"/>
+            </svg>
+          </div>
+          <div class="insight-content">
+            <div class="insight-heading" id="intel-outfit-title">Optimal Outfit</div>
+            <div class="insight-text" id="intel-outfit-desc">Analyzing atmospheric profile...</div>
+            <div class="tag-row" id="intel-outfit-tags">
+              <span class="micro-pill">Layering</span>
+              <span class="micro-pill">Comfort</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Card 2: Travel & Commute -->
+        <div class="insight-card">
+          <div class="insight-icon-bubble bubble-travel">
+            <!-- Travel Car SVG -->
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/>
+              <circle cx="7" cy="17" r="2"/>
+              <path d="M9 17h6"/>
+              <circle cx="17" cy="17" r="2"/>
+            </svg>
+          </div>
+          <div class="insight-content">
+            <div class="insight-heading" id="intel-travel-title">Commute & Road Safety</div>
+            <div class="insight-text" id="intel-travel-desc">Analyzing road friction and visibility...</div>
+            <div class="tag-row" id="intel-travel-tags">
+              <span class="micro-pill">Visibility</span>
+              <span class="micro-pill">Commute</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Card 3: Outdoor Activity & Bio-Comfort -->
+        <div class="insight-card">
+          <div class="insight-icon-bubble bubble-health">
+            <!-- Activity Heart / Pulse SVG -->
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>
+            </svg>
+          </div>
+          <div class="insight-content">
+            <div class="insight-heading" id="intel-health-title">Outdoor Index</div>
+            <div class="insight-text" id="intel-health-desc">Evaluating outdoor sports, running, and wind exposure...</div>
+            <div class="tag-row" id="intel-health-tags">
+              <span class="micro-pill">Outdoor: 8/10</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- FOOTER -->
+    <footer>
+      Powered directly by <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo Weather API</a> • Offline Cache Ready
+    </footer>
+  </div>
+
+  <!-- ==========================================================================
+       VANILLA JAVASCRIPT ENGINE (NO EXTERNAL LIBRARIES, PURE CLIENT-SIDE)
+       ========================================================================== */ -->
+  <script>
+    (function () {
+      "use strict";
+
+      // App State
+      const STATE = {
+        city: "London",
+        country: "United Kingdom",
+        admin1: "",
+        lat: 51.5074,
+        lon: -0.1278,
+        unit: "C", // "C" or "F"
+        currentWeather: null,
+        isLoading: false
+      };
+
+      // WMO Weather Code Directory
+      const WMO_CODES = {
+        0: { text: "Clear Sky", icon: "sun" },
+        1: { text: "Mainly Clear", icon: "sun" },
+        2: { text: "Partly Cloudy", icon: "cloud-sun" },
+        3: { text: "Overcast", icon: "cloud" },
+        45: { text: "Foggy Atmosphere", icon: "fog" },
+        48: { text: "Depositing Rime Fog", icon: "fog" },
+        51: { text: "Light Drizzle", icon: "drizzle" },
+        53: { text: "Moderate Drizzle", icon: "drizzle" },
+        55: { text: "Dense Drizzle", icon: "drizzle" },
+        56: { text: "Freezing Drizzle", icon: "snow" },
+        57: { text: "Heavy Freezing Drizzle", icon: "snow" },
+        61: { text: "Slight Rain", icon: "rain" },
+        63: { text: "Moderate Rain", icon: "rain" },
+        65: { text: "Heavy Rain", icon: "heavy-rain" },
+        66: { text: "Freezing Rain", icon: "snow" },
+        67: { text: "Heavy Freezing Rain", icon: "snow" },
+        71: { text: "Slight Snow Fall", icon: "snow" },
+        73: { text: "Moderate Snow Fall", icon: "snow" },
+        75: { text: "Heavy Snow Fall", icon: "snow" },
+        77: { text: "Snow Grains", icon: "snow" },
+        80: { text: "Light Rain Showers", icon: "rain" },
+        81: { text: "Moderate Showers", icon: "heavy-rain" },
+        82: { text: "Violent Rain Showers", icon: "heavy-rain" },
+        85: { text: "Slight Snow Showers", icon: "snow" },
+        86: { text: "Heavy Snow Showers", icon: "snow" },
+        95: { text: "Thunderstorm", icon: "storm" },
+        96: { text: "Thunderstorm with Hail", icon: "storm" },
+        99: { text: "Severe Hail Thunderstorm", icon: "storm" }
+      };
+
+      // DOM Elements Cache
+      const el = {
+        cityInput: document.getElementById("city-input"),
+        btnSearch: document.getElementById("btn-search"),
+        btnGps: document.getElementById("btn-gps"),
+        btnUnit: document.getElementById("btn-unit"),
+        btnRefresh: document.getElementById("btn-refresh"),
+        btnRetry: document.getElementById("btn-retry"),
+        chipContainer: document.getElementById("chip-container"),
+        loadingOverlay: document.getElementById("loading-overlay"),
+        errorContainer: document.getElementById("error-container"),
+        errorTitle: document.getElementById("error-title"),
+        errorDesc: document.getElementById("error-desc"),
+        weatherDisplay: document.getElementById("weather-display"),
+        offlineBanner: document.getElementById("offline-banner"),
+        // UI text targets
+        uiCity: document.getElementById("ui-city"),
+        uiCoords: document.getElementById("ui-coords"),
+        uiTemp: document.getElementById("ui-temp"),
+        uiUnit: document.getElementById("ui-unit"),
+        uiCondition: document.getElementById("ui-condition"),
+        uiTimestamp: document.getElementById("ui-timestamp"),
+        uiIcon: document.getElementById("ui-icon"),
+        uiWind: document.getElementById("ui-wind"),
+        uiWindDir: document.getElementById("ui-wind-dir"),
+        uiDaynight: document.getElementById("ui-daynight"),
+        // Intel targets
+        intelOutfitTitle: document.getElementById("intel-outfit-title"),
+        intelOutfitDesc: document.getElementById("intel-outfit-desc"),
+        intelOutfitTags: document.getElementById("intel-outfit-tags"),
+        intelTravelTitle: document.getElementById("intel-travel-title"),
+        intelTravelDesc: document.getElementById("intel-travel-desc"),
+        intelTravelTags: document.getElementById("intel-travel-tags"),
+        intelHealthTitle: document.getElementById("intel-health-title"),
+        intelHealthDesc: document.getElementById("intel-health-desc"),
+        intelHealthTags: document.getElementById("intel-health-tags")
+      };
+
+      /* ==========================================================================
+         VECTOR SVG GENERATOR (Zero External CDNs)
+         ========================================================================== */
+      function getSvgIcon(iconName, isDay = 1) {
+        switch (iconName) {
+          case "sun":
+            return isDay 
+              ? `<svg width="84" height="84" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>`
+              : `<svg width="84" height="84" viewBox="0 0 24 24" fill="none" stroke="#a5b4fc" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>`;
+          case "cloud-sun":
+            return `<svg width="84" height="84" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="M20 12h2"/><path d="m19.07 4.93-1.41 1.41"/><path d="M15.947 12.65a4 4 0 0 0-5.925-4.128"/><path d="M13 22H7a5 5 0 1 1 4.9-6H13a3 3 0 0 1 0 6Z"/></svg>`;
+          case "cloud":
+            return `<svg width="84" height="84" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg>`;
+          case "drizzle":
+          case "rain":
+            return `<svg width="84" height="84" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="M8 19v2"/><path d="M8 13v2"/><path d="M12 21v2"/><path d="M12 15v2"/><path d="M16 19v2"/><path d="M16 13v2"/></svg>`;
+          case "heavy-rain":
+            return `<svg width="84" height="84" viewBox="0 0 24 24" fill="none" stroke="#0284c7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="m9 16-2 6"/><path d="m13 16-2 6"/><path d="m17 16-2 6"/></svg>`;
+          case "snow":
+            return `<svg width="84" height="84" viewBox="0 0 24 24" fill="none" stroke="#e0f2fe" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m10 20-1.25-2.5L6 18"/><path d="M10 4 8.75 6.5 6 6"/><path d="m14 20 1.25-2.5L18 18"/><path d="m14 4 1.25 2.5L18 6"/><path d="m17 21 3-6-1.5-3"/><path d="m17 3 3 6-1.5 3"/><path d="M2 12h20"/><path d="m20 10-4 2 4 2"/><path d="m4 10 4 2-4 2"/><path d="m7 21-3-6 1.5-3"/><path d="M7 3 4 9l1.5 3"/></svg>`;
+          case "storm":
+            return `<svg width="84" height="84" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/><path d="m13 15-3 5h4l-1 4"/></svg>`;
+          case "fog":
+          default:
+            return `<svg width="84" height="84" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="M16 17H7"/><path d="M17 21H9"/></svg>`;
+        }
+      }
+
+      /* ==========================================================================
+         COMPASS BEARING TRANSLATOR
+         ========================================================================== */
+      function getWindDirection(deg) {
+        if (deg === undefined || deg === null) return "Calm";
+        const dirs = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"];
+        const index = Math.round(deg / 22.5) % 16;
+        return `${dirs[index]} (${Math.round(deg)}°)`;
+      }
+
+      /* ==========================================================================
+         TEMPERATURE CONVERSION
+         ========================================================================== */
+      function formatTemp(celsius) {
+        if (celsius === undefined || celsius === null) return "--";
+        if (STATE.unit === "F") {
+          const fahrenheit = Math.round((celsius * 9) / 5 + 32);
+          return fahrenheit;
+        }
+        return Math.round(celsius);
+      }
+
+      /* ==========================================================================
+         RULE-BASED INTELLIGENCE ALGORITHM
+         ========================================================================== */
+      function generateIntelligence(tempC, windKph, code, isDay) {
+        const isRainy = (code >= 51 && code <= 67) || (code >= 80 && code <= 82);
+        const isSnowy = (code >= 71 && code <= 77) || (code >= 85 && code <= 86);
+        const isStormy = code >= 95;
+        const isFoggy = code === 45 || code === 48;
+        const isHighWind = windKph >= 30;
+
+        // 1. Outfit Analysis
+        let outfitTitle = "Comfortable Casual";
+        let outfitDesc = "Standard breathable apparel suitable for normal ambient conditions.";
+        let outfitPills = ["Cotton T-Shirt", "Chinos", "Sneakers"];
+
+        if (tempC < 0) {
+          outfitTitle = "Sub-Zero Thermal Bundle";
+          outfitDesc = "Extreme cold alert. Layer up with thermal undergarments, insulated down parka, fleece, gloves, and a woolen beanie.";
+          outfitPills = ["Down Parka", "Thermal Underwear", "Wool Beanie", "Gloves"];
+        } else if (tempC >= 0 && tempC < 10) {
+          outfitTitle = "Warm Layering Required";
+          outfitDesc = "Chilly air. Wear a fleece sweater, warm coat or windproof jacket with closed leather shoes.";
+          outfitPills = ["Winter Coat", "Fleece Sweater", "Scarf"];
+        } else if (tempC >= 10 && tempC < 18) {
+          outfitTitle = "Light Jacket / Hoodie";
+          outfitDesc = "Mildly brisk weather. A denim jacket, light cardigan, or pullover over casual shirts will keep you comfortable.";
+          outfitPills = ["Light Jacket", "Hoodie", "Comfort Denim"];
+        } else if (tempC >= 18 && tempC < 26) {
+          outfitTitle = "Optimal Ambient Comfort";
+          outfitDesc = "Pleasantly balanced temperature. Standard cotton t-shirts, light blouses, or short sleeves with sneakers are ideal.";
+          outfitPills = ["Cotton T-Shirt", "Casual Shorts/Jeans", "Sneakers"];
+        } else if (tempC >= 26 && tempC < 34) {
+          outfitTitle = "Warm Summer Wear";
+          outfitDesc = "Elevated temperature. Wear loose, light-colored breathable linen or moisture-wicking fabrics. Carry UV sunglasses.";
+          outfitPills = ["Linen Shirt", "UV Sunglasses", "Sun Hat"];
+        } else {
+          outfitTitle = "Heatwave Advisory Gear";
+          outfitDesc = "High heat risk. Ultra-light, loose fabrics, wide-brim hat, and high UV eye protection. Carry constant hydration.";
+          outfitPills = ["Loose Linen", "Wide-Brim Hat", "SPF Protection"];
+        }
+
+        if (isRainy || isStormy) {
+          outfitDesc += " Wet conditions detected: carry a stormproof umbrella and water-resistant outer shell.";
+          outfitPills.push("Umbrella", "Waterproof Shoes");
+        } else if (isSnowy) {
+          outfitDesc += " Slush & snow: insulated boots with textured traction outsoles are mandatory.";
+          outfitPills.push("Snow Boots", "Thermal Socks");
+        } else if (isHighWind) {
+          outfitDesc += " Gusty winds: avoid loose hats and wear a windbreaker.";
+          outfitPills.push("Windbreaker");
+        }
+
+        // 2. Travel & Road Safety Analysis
+        let travelTitle = "Clear Commute Conditions";
+        let travelDesc = "Road conditions are stable with clear visibility and standard braking traction.";
+        let travelPills = ["Roads Clear", "Normal Transit", "Good Traction"];
+
+        if (isStormy) {
+          travelTitle = "Severe Thunderstorm Hazard";
+          travelDesc = "Dangerous lightning and hydroplaning risks. Delay non-essential highway travel and park away from tall trees.";
+          travelPills = ["Hydroplane Risk", "Delay Travel", "Storm Warning"];
+        } else if (isSnowy) {
+          travelTitle = "Snow & Black Ice Warning";
+          travelDesc = "Significant reduction in tire traction. Double your safe braking distance and use winter chains if driving mountain passes.";
+          travelPills = ["Slippery Roads", "Drive Slow", "Braking Distance x2"];
+        } else if (isRainy) {
+          travelTitle = "Wet Asphalt Precaution";
+          travelDesc = "Roads may be slick. Allow an extra 10-15 minutes for travel and keep headlights on for oncoming vehicle visibility.";
+          travelPills = ["Wet Roads", "Headlights On", "+15m Travel Time"];
+        } else if (isFoggy) {
+          travelTitle = "Low Visibility Warning";
+          travelDesc = "Heavy fog limiting optical range. Engage low-beam fog lights, avoid sudden overtaking, and track road line markers.";
+          travelPills = ["Fog Lights", "Low Visibility", "Cautious Overtake"];
+        } else if (isHighWind) {
+          travelTitle = "Crosswind Gust Advisory";
+          travelDesc = "High crosswinds on bridges, highways, and overpasses. Two-wheelers and high-profile trucks should exercise caution.";
+          travelPills = ["Bridge Gusts", "Two-Wheeler Caution"];
+        }
+
+        // 3. Outdoor Activity & Bio-Index
+        let healthTitle = "Outdoor Activity Score: 9/10";
+        let healthDesc = "Great air stability and agreeable thermal profile. Ideal for outdoor running, cycling, and park strolls.";
+        let healthPills = ["Great for Jogging", "Cycling Friendly", "Park Strolls"];
+
+        if (isStormy || isSnowy) {
+          healthTitle = "Outdoor Activity Score: 2/10";
+          healthDesc = "Hazardous outdoor elements. Recommended to shift physical exercises to indoor gyms or living rooms.";
+          healthPills = ["Stay Indoors", "Gym Workout"];
+        } else if (tempC > 33) {
+          healthTitle = "Outdoor Activity Score: 4/10";
+          healthDesc = "Elevated heat stress. Schedule workouts early in the morning before 8 AM or after sunset. Drink at least 500ml water hourly.";
+          healthPills = ["Hydrate Constantly", "Morning Runs Only"];
+        } else if (tempC < 2) {
+          healthTitle = "Outdoor Activity Score: 4/10";
+          healthDesc = "Brisk cold shock. Warm up thoroughly indoors before outdoor cardio to prevent joint strain and muscle cramps.";
+          healthPills = ["Warm Up Indoors", "Cover Extremities"];
+        } else if (isRainy) {
+          healthTitle = "Outdoor Activity Score: 5/10";
+          healthDesc = "Damp surfaces. Outdoor running viable with waterproof traction trail shoes; otherwise prefer indoor training.";
+          healthPills = ["Slick Footpaths", "Indoor Alternatives"];
+        }
+
+        return {
+          outfit: { title: outfitTitle, desc: outfitDesc, pills: outfitPills },
+          travel: { title: travelTitle, desc: travelDesc, pills: travelPills },
+          health: { title: healthTitle, desc: healthDesc, pills: healthPills }
+        };
+      }
+
+      /* ==========================================================================
+         RENDER ENGINE
+         ========================================================================== */
+      function renderWeather(data, locName, locRegion, locCountry) {
+        const cur = data.current_weather;
+        if (!cur) throw new Error("No current weather data in Open-Meteo response");
+
+        STATE.currentWeather = cur;
+        const code = cur.weathercode ?? 0;
+        const info = WMO_CODES[code] || { text: "Cloudy", icon: "cloud" };
+
+        // 1. Text & Location
+        el.uiCity.textContent = locName || STATE.city;
+        const regionStr = locRegion ? `${locRegion}, ` : "";
+        const countryStr = locCountry || STATE.country;
+        el.uiCoords.textContent = `${regionStr}${countryStr} • ${data.latitude.toFixed(2)}°, ${data.longitude.toFixed(2)}°`;
+
+        // 2. Temperature & Condition
+        el.uiTemp.textContent = formatTemp(cur.temperature);
+        el.uiUnit.textContent = `°${STATE.unit}`;
+        el.uiCondition.textContent = info.text;
+
+        // 3. Dynamic Vector Icon
+        el.uiIcon.innerHTML = getSvgIcon(info.icon, cur.is_day);
+
+        // 4. Time
+        const timeObj = new Date(cur.time);
+        el.uiTimestamp.textContent = `Local time: ${isNaN(timeObj) ? "Real-time" : timeObj.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+
+        // 5. Telemetry
+        el.uiWind.textContent = `${Math.round(cur.windspeed)} km/h`;
+        el.uiWindDir.textContent = getWindDirection(cur.winddirection);
+        el.uiDaynight.textContent = cur.is_day === 1 ? "Daylight ☀️" : "Nighttime 🌙";
+
+        // 6. Intelligent Engine Updates
+        const intel = generateIntelligence(cur.temperature, cur.windspeed, code, cur.is_day);
+
+        // Outfit
+        el.intelOutfitTitle.textContent = intel.outfit.title;
+        el.intelOutfitDesc.textContent = intel.outfit.desc;
+        el.intelOutfitTags.innerHTML = intel.outfit.pills.map(p => `<span class="micro-pill">${p}</span>`).join("");
+
+        // Travel
+        el.intelTravelTitle.textContent = intel.travel.title;
+        el.intelTravelDesc.textContent = intel.travel.desc;
+        el.intelTravelTags.innerHTML = intel.travel.pills.map(p => `<span class="micro-pill">${p}</span>`).join("");
+
+        // Health
+        el.intelHealthTitle.textContent = intel.health.title;
+        el.intelHealthDesc.textContent = intel.health.desc;
+        el.intelHealthTags.innerHTML = intel.health.pills.map(p => `<span class="micro-pill">${p}</span>`).join("");
+
+        // Cache into localStorage for offline instant boot
+        try {
+          const cachePayload = {
+            city: locName || STATE.city,
+            region: locRegion,
+            country: locCountry,
+            data: data,
+            savedAt: Date.now()
+          };
+          localStorage.setItem("visky_weather_cache", JSON.stringify(cachePayload));
+        } catch (e) {}
+      }
+
+      /* ==========================================================================
+         OPEN-METEO API FETCHING ENGINE
+         ========================================================================== */
+      async function fetchWeatherByCity(cityName) {
+        if (!cityName || !cityName.trim()) {
+          showError("Input Required", "Please type a city name in the search box.");
+          return;
+        }
+
+        const trimmedCity = cityName.trim();
+        setLoading(true);
+        hideError();
+
+        try {
+          // Step 1: Open-Meteo Geocoding API
+          const geoUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(trimmedCity)}&count=1&language=en&format=json`;
+          
+          const geoRes = await fetchWithTimeout(geoUrl, 10000);
+          if (!geoRes.ok) {
+            throw new Error(`Geocoding server responded with status: ${geoRes.status}`);
+          }
+          
+          const geoData = await geoRes.json();
+          if (!geoData.results || geoData.results.length === 0) {
+            throw new Error(`Could not find any location matching "${trimmedCity}". Please verify spelling.`);
+          }
+
+          const target = geoData.results[0];
+          STATE.city = target.name;
+          STATE.country = target.country || "";
+          STATE.admin1 = target.admin1 || "";
+          STATE.lat = target.latitude;
+          STATE.lon = target.longitude;
+
+          // Step 2: Open-Meteo Real-Time Weather API
+          await fetchWeatherByCoordinates(target.latitude, target.longitude, target.name, target.admin1, target.country);
+
+        } catch (err) {
+          showError("Weather Retrieval Failed", err.message || "Unable to reach Open-Meteo API. Check internet connection.");
+        } finally {
+          setLoading(false);
+        }
+      }
+
+      async function fetchWeatherByCoordinates(lat, lon, name = "Current GPS Location", region = "", country = "") {
+        setLoading(true);
+        hideError();
+
+        try {
+          const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true&timezone=auto`;
+          
+          const weatherRes = await fetchWithTimeout(weatherUrl, 10000);
+          if (!weatherRes.ok) {
+            throw new Error(`Weather engine responded with HTTP: ${weatherRes.status}`);
+          }
+
+          const weatherData = await weatherRes.json();
+          renderWeather(weatherData, name, region, country);
+          updateActiveChip(name);
+
+        } catch (err) {
+          showError("Atmospheric Data Error", err.message || "Failed to download weather data.");
+        } finally {
+          setLoading(false);
+        }
+      }
+
+      function fetchWithTimeout(url, timeoutMs = 9000) {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+        return fetch(url, { signal: controller.signal })
+          .then((res) => {
+            clearTimeout(timeoutId);
+            return res;
+          })
+          .catch((err) => {
+            clearTimeout(timeoutId);
+            if (err.name === "AbortError") {
+              throw new Error("Connection timed out. Open-Meteo servers are taking too long to respond.");
+            }
+            throw err;
+          });
+      }
+
+      function setLoading(isLoading) {
+        STATE.isLoading = isLoading;
+        el.loadingOverlay.style.display = isLoading ? "flex" : "none";
+        el.btnRefresh.style.opacity = isLoading ? "0.6" : "1";
+      }
+
+      function showError(title, desc) {
+        el.errorTitle.textContent = title;
+        el.errorDesc.textContent = desc;
+        el.errorContainer.style.display = "flex";
+      }
+
+      function hideError() {
+        el.errorContainer.style.display = "none";
+      }
+
+      function updateActiveChip(cityName) {
+        const chips = el.chipContainer.querySelectorAll(".city-chip");
+        chips.forEach((c) => {
+          if (c.dataset.city.toLowerCase() === cityName.toLowerCase()) {
+            c.classList.add("active");
+          } else {
+            c.classList.remove("active");
+          }
+        });
+      }
+
+      // 1. City Search Submission
+      el.btnSearch.addEventListener("click", () => {
+        fetchWeatherByCity(el.cityInput.value);
+      });
+
+      el.cityInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          fetchWeatherByCity(el.cityInput.value);
+        }
+      });
+
+      // 2. Preset Chips Click
+      el.chipContainer.addEventListener("click", (e) => {
+        const chip = e.target.closest(".city-chip");
+        if (chip && chip.dataset.city) {
+          el.cityInput.value = chip.dataset.city;
+          fetchWeatherByCity(chip.dataset.city);
+        }
+      });
+
+      // 3. Temperature Unit Toggle (°C <-> °F)
+      el.btnUnit.addEventListener("click", () => {
+        STATE.unit = STATE.unit === "C" ? "F" : "C";
+        el.btnUnit.textContent = `°${STATE.unit}`;
+        if (STATE.currentWeather) {
+          el.uiTemp.textContent = formatTemp(STATE.currentWeather.temperature);
+          el.uiUnit.textContent = `°${STATE.unit}`;
+        }
+      });
+
+      // 4. Refresh Button
+      el.btnRefresh.addEventListener("click", () => {
+        fetchWeatherByCoordinates(STATE.lat, STATE.lon, STATE.city, STATE.admin1, STATE.country);
+      });
+
+      // 5. Retry Button
+      el.btnRetry.addEventListener("click", () => {
+        fetchWeatherByCity(el.cityInput.value || STATE.city);
+      });
+
+      // 6. Device GPS Location
+      el.btnGps.addEventListener("click", () => {
+        if (!navigator.geolocation) {
+          showError("GPS Not Supported", "Your browser or device does not support GPS location services.");
+          return;
+        }
+
+        setLoading(true);
+        hideError();
+
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const lat = position.coords.latitude;
+            const lon = position.coords.longitude;
+            STATE.lat = lat;
+            STATE.lon = lon;
+            fetchWeatherByCoordinates(lat, lon, "GPS Location", "Device Coordinates", "");
+          },
+          (err) => {
+            setLoading(false);
+            let msg = "Could not retrieve GPS position.";
+            if (err.code === 1) msg = "Location permission was denied. Please allow location access in your device settings.";
+            else if (err.code === 2) msg = "Position unavailable. GPS signal weak or unavailable.";
+            else if (err.code === 3) msg = "Location request timed out.";
+            showError("GPS Access Error", msg);
+          },
+          { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 }
+        );
+      });
+
+      // 7. Offline / Online Connectivity Listeners
+      function handleOnlineStatus() {
+        if (!navigator.onLine) {
+          el.offlineBanner.style.display = "flex";
+        } else {
+          el.offlineBanner.style.display = "none";
+        }
+      }
+
+      window.addEventListener("online", handleOnlineStatus);
+      window.addEventListener("offline", handleOnlineStatus);
+
+      // Initial Boot
+      function bootApplication() {
+        handleOnlineStatus();
+
+        try {
+          const cached = localStorage.getItem("visky_weather_cache");
+          if (cached) {
+            const parsed = JSON.parse(cached);
+            if (parsed && parsed.data) {
+              STATE.city = parsed.city || "London";
+              STATE.country = parsed.country || "";
+              STATE.admin1 = parsed.region || "";
+              STATE.lat = parsed.data.latitude;
+              STATE.lon = parsed.data.longitude;
+              renderWeather(parsed.data, parsed.city, parsed.region, parsed.country);
+            }
+          }
+        } catch (e) {}
+
+        if (navigator.onLine) {
+          fetchWeatherByCity(STATE.city || "London");
+        }
+      }
+
+      bootApplication();
+    })();
+  </script>
+</body>
+</html>

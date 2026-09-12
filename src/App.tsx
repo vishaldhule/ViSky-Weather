@@ -4,7 +4,7 @@
  */
 
 import { useEffect, useState, useCallback, useRef } from "react";
-import type { FormEvent } from "react";
+import type { FormEvent, MouseEvent } from "react";
 import { 
   Search, 
   MapPin, 
@@ -32,7 +32,9 @@ import {
   Building2,
   Check,
   CloudSun,
-  Activity
+  Activity,
+  Trash2,
+  Globe
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { WeatherData, LocationSuggestion, MobileTab } from "./types";
@@ -44,6 +46,16 @@ import { SettingsModal } from "./components/SettingsModal";
 import { MobileBottomNav } from "./components/MobileBottomNav";
 import { INDIAN_METROS } from "./utils/locationHelper";
 import { TRANSLATIONS, LanguageCode, TranslationStrings } from "./utils/translations";
+import {
+  searchLocationsUniversal,
+  resolveQueryToCoordinates,
+  getSearchHistory,
+  saveSearchHistory,
+  removeSearchHistoryItem,
+  clearAllSearchHistory,
+  UniversalLocationResult,
+  SearchHistoryItem
+} from "./utils/universalGeocoder";
 
 const API_KEY = "8418358e19a94f2fadc175103260905";
 
@@ -74,6 +86,13 @@ export default function App() {
   const [isPermissionDenied, setIsPermissionDenied] = useState(false);
   const [showPermissionTip, setShowPermissionTip] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Search Focus Mode & Universal Geocoding State
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const [searchHistory, setSearchHistory] = useState<SearchHistoryItem[]>(() => getSearchHistory());
+  const [universalSuggestions, setUniversalSuggestions] = useState<UniversalLocationResult[]>([]);
+  const [isSearchingLocations, setIsSearchingLocations] = useState(false);
+  const [customDisplayName, setCustomDisplayName] = useState<string | null>(null);
 
   // Language state (default: English, can be changed in settings)
   const [language, setLanguage] = useState<LanguageCode>(() => {
@@ -106,12 +125,22 @@ export default function App() {
     return `${Math.round((tempC * 9) / 5 + 32)}°`;
   };
 
-  // Weather data fetcher
-  const fetchWeather = useCallback(async (location: string, isGps = false) => {
+  // Weather data fetcher with custom display name support
+  const fetchWeather = useCallback(async (location: string, isGps = false, overrideName?: string) => {
     setLoading(true);
     setError("");
-    setSuggestions([]);
+    setUniversalSuggestions([]);
     setShowSuggestions(false);
+    setIsSearchFocused(false);
+
+    if (overrideName) {
+      setCustomDisplayName(overrideName);
+    } else if (isGps) {
+      setCustomDisplayName(null);
+    } else {
+      setCustomDisplayName(null);
+    }
+
     try {
       const response = await fetch(
         `https://api.weatherapi.com/v1/forecast.json?key=${API_KEY}&q=${encodeURIComponent(location)}&days=7&aqi=yes&alerts=yes`
@@ -202,36 +231,122 @@ export default function App() {
     }
   }, [fetchWeather, handleRequestLocation]);
 
-  // Autocomplete search
+  // Universal micro-city & global autocomplete search
   useEffect(() => {
     if (searchQuery.trim().length < 2) {
-      setSuggestions([]);
+      setUniversalSuggestions([]);
+      setIsSearchingLocations(false);
       return;
     }
 
+    setIsSearchingLocations(true);
     const timer = setTimeout(async () => {
       try {
-        const response = await fetch(
-          `https://api.weatherapi.com/v1/search.json?key=${API_KEY}&q=${encodeURIComponent(searchQuery)}`
-        );
-        if (response.ok) {
-          const data = await response.json();
-          setSuggestions(data);
-          setShowSuggestions(true);
-        }
+        const results = await searchLocationsUniversal(searchQuery, API_KEY);
+        setUniversalSuggestions(results);
+        setShowSuggestions(true);
       } catch {
         // Ignore autocomplete network errors
+      } finally {
+        setIsSearchingLocations(false);
       }
-    }, 250);
+    }, 200);
 
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  const handleSearch = (e: FormEvent) => {
+  // Escape key closes search focus
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isSearchFocused) {
+        setIsSearchFocused(false);
+        setShowSuggestions(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isSearchFocused]);
+
+  const handleSearch = async (e: FormEvent) => {
     e.preventDefault();
-    if (searchQuery.trim()) {
-      fetchWeather(searchQuery.trim(), false);
+    const query = searchQuery.trim();
+    if (!query) return;
+
+    setIsSearchingLocations(true);
+    try {
+      const resolved = await resolveQueryToCoordinates(query, API_KEY);
+      const nameToDisplay = resolved.displayName || query;
+
+      // Extract coords to save to search history
+      const coords = resolved.query.split(',');
+      if (coords.length === 2) {
+        const lat = parseFloat(coords[0]);
+        const lon = parseFloat(coords[1]);
+        if (!isNaN(lat) && !isNaN(lon)) {
+          const updated = saveSearchHistory({
+            name: nameToDisplay,
+            region: "",
+            country: "",
+            lat,
+            lon,
+            type: "City"
+          });
+          setSearchHistory(updated);
+        }
+      }
+
+      fetchWeather(resolved.query, false, nameToDisplay);
+    } catch {
+      fetchWeather(query, false);
+    } finally {
+      setIsSearchingLocations(false);
+      setIsSearchFocused(false);
+      setShowSuggestions(false);
     }
+  };
+
+  const handleSelectLocation = (item: UniversalLocationResult) => {
+    const updated = saveSearchHistory({
+      name: item.name,
+      region: item.region,
+      country: item.country,
+      lat: item.lat,
+      lon: item.lon,
+      type: item.type
+    });
+    setSearchHistory(updated);
+    fetchWeather(`${item.lat},${item.lon}`, false, item.name);
+    setIsSearchFocused(false);
+    setShowSuggestions(false);
+    setSearchQuery("");
+  };
+
+  const handleSelectHistoryItem = (item: SearchHistoryItem) => {
+    const updated = saveSearchHistory({
+      name: item.name,
+      region: item.region,
+      country: item.country,
+      lat: item.lat,
+      lon: item.lon,
+      type: item.type
+    });
+    setSearchHistory(updated);
+    fetchWeather(`${item.lat},${item.lon}`, false, item.name);
+    setIsSearchFocused(false);
+    setShowSuggestions(false);
+    setSearchQuery("");
+  };
+
+  const handleRemoveHistory = (e: MouseEvent, id: string) => {
+    e.stopPropagation();
+    const updated = removeSearchHistoryItem(id);
+    setSearchHistory(updated);
+  };
+
+  const handleClearAllHistory = (e: MouseEvent) => {
+    e.stopPropagation();
+    clearAllSearchHistory();
+    setSearchHistory([]);
   };
 
   const handleRefresh = () => {
@@ -290,146 +405,379 @@ export default function App() {
       </AnimatePresence>
 
       {/* Top Aesthetic Header */}
-      <header className="sticky top-0 z-40 bg-[#0b1e42]/85 backdrop-blur-2xl border-b border-white/[0.12] px-4 py-3 shadow-sm">
-        <div className="max-w-4xl mx-auto flex items-center justify-between gap-3">
-          {/* Logo / Brand */}
-          <div 
-            onClick={() => fetchWeather("New Delhi", false)} 
-            className="flex items-center gap-2 cursor-pointer group shrink-0"
-            title="Indra Weather - Reset to New Delhi"
-          >
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-sky-400/30 to-amber-400/20 border border-sky-400/40 flex items-center justify-center text-amber-300 group-hover:scale-105 transition-transform shadow-md">
-              <Sparkles className="w-4 h-4" />
+      <header className="sticky top-0 z-40 bg-[#0b1e42]/90 backdrop-blur-2xl border-b border-white/[0.12] px-4 py-3 shadow-md">
+        <div className="max-w-4xl mx-auto flex items-center justify-between gap-2.5">
+          {/* Logo / Brand - Hidden when search is focused */}
+          {!isSearchFocused && (
+            <div 
+              onClick={() => fetchWeather("New Delhi", false)} 
+              className="flex items-center gap-2 cursor-pointer group shrink-0"
+              title="Indra Weather - Reset to New Delhi"
+            >
+              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-sky-400/30 to-amber-400/20 border border-sky-400/40 flex items-center justify-center text-amber-300 group-hover:scale-105 transition-transform shadow-md">
+                <Sparkles className="w-4 h-4" />
+              </div>
+              <span className="text-base font-bold tracking-tight text-white group-hover:text-sky-300 transition-colors hidden sm:inline">
+                {t.appName.split(' ')[0]}
+              </span>
             </div>
-            <span className="text-base font-bold tracking-tight text-white group-hover:text-sky-300 transition-colors hidden sm:inline">
-              {t.appName.split(' ')[0]}
-            </span>
-          </div>
+          )}
 
-          {/* Search Bar */}
-          <div className="relative flex-1 max-w-md">
-            <form onSubmit={handleSearch} className="relative">
-              <input
-                ref={searchInputRef}
-                type="text"
-                placeholder={t.searchPlaceholder}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onFocus={() => searchQuery.length >= 2 && setShowSuggestions(true)}
-                className="w-full bg-white/[0.08] hover:bg-white/[0.12] focus:bg-white/[0.16] border border-white/15 focus:border-sky-400/60 rounded-2xl py-2 px-3.5 pl-9 text-xs sm:text-sm font-medium text-white placeholder:text-white/40 focus:outline-none transition-all shadow-inner"
-              />
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/50 pointer-events-none" />
+          {/* Search Bar - Expands to full width with intense NEON styling */}
+          <div className={`relative transition-all duration-300 ${isSearchFocused ? "w-full flex-1 max-w-none" : "flex-1 max-w-md"}`}>
+            <form onSubmit={handleSearch} className="relative flex items-center gap-2">
+              <div className="relative flex-1">
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  placeholder={isSearchFocused ? "Search any city, micro-city, village, or taluka worldwide..." : t.searchPlaceholder}
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onFocus={() => {
+                    setIsSearchFocused(true);
+                    setShowSuggestions(true);
+                  }}
+                  className={`w-full rounded-2xl py-2.5 px-3.5 pl-10 pr-9 text-xs sm:text-sm font-medium text-white placeholder:text-white/40 focus:outline-none transition-all ${
+                    isSearchFocused
+                      ? "bg-[#051126]/95 border-2 border-cyan-400 text-white shadow-[0_0_24px_rgba(34,211,238,0.65),0_0_48px_rgba(6,182,212,0.3),inset_0_0_12px_rgba(34,211,238,0.2)] ring-2 ring-cyan-400/30"
+                      : "bg-white/[0.08] hover:bg-white/[0.12] border border-white/15 focus:border-sky-400/60 shadow-inner"
+                  }`}
+                />
+                <Search className={`absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none transition-colors ${
+                  isSearchFocused ? "text-cyan-400 drop-shadow-[0_0_8px_#22d3ee]" : "text-white/50"
+                }`} />
+
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchQuery("");
+                      setUniversalSuggestions([]);
+                      searchInputRef.current?.focus();
+                    }}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full text-white/50 hover:text-white hover:bg-white/10"
+                    title="Clear text"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+
+              {/* Close / Cancel Button in Search Focus Mode */}
+              {isSearchFocused && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsSearchFocused(false);
+                    setShowSuggestions(false);
+                  }}
+                  className="px-3.5 py-2.5 rounded-2xl bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-400/40 text-cyan-300 hover:text-white text-xs font-semibold flex items-center gap-1.5 transition-all shadow-[0_0_15px_rgba(34,211,238,0.25)] shrink-0 active:scale-95"
+                >
+                  <X className="w-3.5 h-3.5" />
+                  <span>Cancel</span>
+                </button>
+              )}
             </form>
 
-            {/* Suggestions Dropdown */}
+            {/* Suggestions & Search History Dropdown with Neon Accents */}
             <AnimatePresence>
-              {showSuggestions && suggestions.length > 0 && (
+              {isSearchFocused && showSuggestions && (
                 <motion.div
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 8 }}
-                  className="absolute top-full left-0 right-0 mt-2 bg-[#0c224a]/95 backdrop-blur-3xl border border-sky-400/30 rounded-2xl overflow-hidden shadow-2xl z-50 max-h-64 overflow-y-auto"
+                  initial={{ opacity: 0, y: 8, scale: 0.98 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 8, scale: 0.98 }}
+                  transition={{ duration: 0.18 }}
+                  className="absolute top-full left-0 right-0 mt-2 bg-[#08152e]/95 backdrop-blur-3xl border-2 border-cyan-400/70 rounded-2xl overflow-hidden shadow-[0_0_35px_rgba(34,211,238,0.4),0_0_70px_rgba(6,182,212,0.2)] z-50 max-h-[75vh] sm:max-h-96 overflow-y-auto"
                 >
-                  {suggestions.map((s) => (
-                    <button
-                      key={s.id}
-                      onClick={() => fetchWeather(`${s.lat},${s.lon}`, false)}
-                      className="w-full px-4 py-2.5 text-left hover:bg-white/15 flex items-center justify-between group transition-colors text-xs border-b border-white/[0.06] last:border-0"
-                    >
+                  {/* Neon Top Glowing Line */}
+                  <div className="h-[2px] bg-gradient-to-r from-transparent via-cyan-400 to-transparent shadow-[0_0_12px_#22d3ee]" />
+
+                  {/* Engine Tag Header */}
+                  <div className="px-4 py-2 bg-cyan-950/40 border-b border-cyan-400/20 flex items-center justify-between text-[11px] text-cyan-300 font-medium">
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping" />
+                      <span className="font-bold tracking-wide uppercase">Universal Micro-City & Village Engine</span>
+                    </div>
+                    <span className="text-[10px] text-cyan-300/60 font-mono">Worldwide Coverage</span>
+                  </div>
+
+                  {/* CASE 1: Query is empty/short -> Show Search History & Quick City Chips */}
+                  {searchQuery.trim().length < 2 && (
+                    <div className="p-3 space-y-4">
+                      {/* Search History Section */}
                       <div>
-                        <p className="font-semibold text-white group-hover:text-amber-300">{s.name}</p>
-                        <p className="text-[10px] text-white/50">{s.region}, {s.country}</p>
+                        <div className="flex items-center justify-between mb-2 px-1">
+                          <div className="flex items-center gap-1.5 text-xs font-bold text-white/90">
+                            <Clock className="w-3.5 h-3.5 text-cyan-400" />
+                            <span>Recent Searches ({searchHistory.length})</span>
+                          </div>
+                          {searchHistory.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={handleClearAllHistory}
+                              className="text-[11px] text-rose-300/80 hover:text-rose-200 flex items-center gap-1 transition-colors"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                              <span>Clear All</span>
+                            </button>
+                          )}
+                        </div>
+
+                        {searchHistory.length > 0 ? (
+                          <div className="space-y-1">
+                            {searchHistory.map((item) => (
+                              <div
+                                key={item.id}
+                                onClick={() => handleSelectHistoryItem(item)}
+                                className="w-full px-3 py-2 rounded-xl bg-white/[0.04] hover:bg-cyan-500/15 border border-white/[0.06] hover:border-cyan-400/40 flex items-center justify-between group transition-all cursor-pointer"
+                              >
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                  <div className="w-7 h-7 rounded-lg bg-cyan-400/10 border border-cyan-400/20 flex items-center justify-center text-cyan-400 group-hover:scale-105 shrink-0">
+                                    <Clock className="w-3.5 h-3.5" />
+                                  </div>
+                                  <div className="truncate text-left">
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-semibold text-xs text-white group-hover:text-cyan-300 truncate">
+                                        {item.name}
+                                      </span>
+                                      {item.type && (
+                                        <span className="px-1.5 py-0.2 text-[9px] rounded-md bg-white/10 text-cyan-200/80 font-mono">
+                                          {item.type}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <p className="text-[10px] text-white/50 truncate">
+                                      {item.region ? `${item.region}, ` : ''}{item.country || "Coordinates"}
+                                    </p>
+                                  </div>
+                                </div>
+
+                                <button
+                                  type="button"
+                                  onClick={(e) => handleRemoveHistory(e, item.id)}
+                                  className="p-1 rounded-lg text-white/30 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+                                  title="Remove from history"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="px-3 py-3 rounded-xl bg-white/[0.03] border border-dashed border-white/10 text-center">
+                            <p className="text-xs text-white/50">No search history yet.</p>
+                            <p className="text-[10px] text-cyan-300/60 mt-0.5">Type any village, taluka, town, or city above.</p>
+                          </div>
+                        )}
                       </div>
-                      <ChevronRight className="w-3.5 h-3.5 text-white/30 group-hover:text-amber-300" />
-                    </button>
-                  ))}
+
+                      {/* Quick Popular & Micro-City Suggestions */}
+                      <div>
+                        <div className="flex items-center gap-1.5 text-xs font-bold text-white/80 mb-2 px-1">
+                          <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                          <span>Quick Search Suggestions</span>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {[
+                            { name: "Sambhaji Nagar", query: "19.8773,75.3390", tag: "Maharashtra" },
+                            { name: "Mumbai", query: "Mumbai", tag: "Metro" },
+                            { name: "Pune", query: "Pune", tag: "Maharashtra" },
+                            { name: "New Delhi", query: "New Delhi", tag: "Capital" },
+                            { name: "Bengaluru", query: "Bengaluru", tag: "Tech Hub" },
+                            { name: "London", query: "London", tag: "UK" },
+                            { name: "Tokyo", query: "Tokyo", tag: "Japan" },
+                            { name: "Dubai", query: "Dubai", tag: "UAE" },
+                            { name: "New York", query: "New York", tag: "USA" },
+                          ].map((chip) => (
+                            <button
+                              key={chip.name}
+                              type="button"
+                              onClick={() => {
+                                fetchWeather(chip.query, false, chip.name);
+                                setIsSearchFocused(false);
+                                setShowSuggestions(false);
+                                setSearchQuery("");
+                              }}
+                              className="px-2.5 py-1 rounded-xl bg-white/[0.06] hover:bg-cyan-500/20 hover:border-cyan-400/50 border border-white/10 text-xs font-medium text-white/90 hover:text-cyan-200 transition-all flex items-center gap-1.5 active:scale-95"
+                            >
+                              <span>{chip.name}</span>
+                              <span className="text-[9px] text-cyan-300/60">({chip.tag})</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* CASE 2: Query has >= 2 characters -> Show Live Universal Results */}
+                  {searchQuery.trim().length >= 2 && (
+                    <div className="divide-y divide-white/[0.06]">
+                      {isSearchingLocations ? (
+                        <div className="py-8 text-center space-y-2">
+                          <div className="w-6 h-6 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin mx-auto shadow-[0_0_10px_#22d3ee]" />
+                          <p className="text-xs text-cyan-200 font-medium animate-pulse">
+                            Searching global micro-cities & villages for "{searchQuery}"...
+                          </p>
+                        </div>
+                      ) : universalSuggestions.length > 0 ? (
+                        universalSuggestions.map((s) => (
+                          <button
+                            key={s.id}
+                            type="button"
+                            onClick={() => handleSelectLocation(s)}
+                            className="w-full px-4 py-3 text-left hover:bg-cyan-500/15 flex items-center justify-between group transition-all text-xs"
+                          >
+                            <div className="flex items-start gap-3 min-w-0">
+                              <div className="w-7 h-7 rounded-lg bg-cyan-400/15 border border-cyan-400/30 flex items-center justify-center text-cyan-400 group-hover:scale-110 shrink-0 mt-0.5 shadow-sm">
+                                <MapPin className="w-3.5 h-3.5" />
+                              </div>
+                              <div className="truncate">
+                                <div className="flex items-center gap-2">
+                                  <p className="font-bold text-sm text-white group-hover:text-cyan-300 transition-colors truncate">
+                                    {s.name}
+                                  </p>
+                                  {s.type && (
+                                    <span className="px-1.5 py-0.5 text-[9px] rounded-md bg-cyan-400/20 border border-cyan-400/30 text-cyan-200 font-semibold uppercase">
+                                      {s.type}
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-[11px] text-white/60 mt-0.5 truncate">
+                                  {s.region ? `${s.region}, ` : ''}{s.country}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1.5 shrink-0 text-white/40 group-hover:text-cyan-300">
+                              <span className="text-[10px] hidden sm:inline text-white/40 font-mono">
+                                {s.lat.toFixed(2)}°, {s.lon.toFixed(2)}°
+                              </span>
+                              <ChevronRight className="w-4 h-4" />
+                            </div>
+                          </button>
+                        ))
+                      ) : (
+                        <div className="py-8 text-center px-4">
+                          <p className="text-xs text-white/70 font-semibold">No direct match found for "{searchQuery}"</p>
+                          <p className="text-[11px] text-cyan-300/70 mt-1">Press Enter to force direct coordinates lookup across our global satellites.</p>
+                          <button
+                            type="button"
+                            onClick={handleSearch}
+                            className="mt-3 px-4 py-1.5 rounded-xl bg-cyan-400 text-slate-950 font-bold text-xs shadow-lg shadow-cyan-400/30 hover:bg-cyan-300 transition-all"
+                          >
+                            Force Search "{searchQuery}"
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </motion.div>
               )}
             </AnimatePresence>
           </div>
 
-          {/* Action Controls */}
-          <div className="flex items-center gap-1.5 shrink-0">
-            {/* Live Location Button */}
-            <button
-              id="live-gps-btn"
-              onClick={handleRequestLocation}
-              disabled={isLocating}
-              className={`px-3 py-1.5 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 shadow-sm ${
-                isLiveLocation
-                  ? "bg-emerald-400/20 text-emerald-300 border-emerald-400/40"
-                  : "bg-white/[0.08] hover:bg-white/[0.14] text-white/85 hover:text-white border-white/15"
-              }`}
-              title="Use current GPS location"
-            >
-              <LocateFixed className={`w-3.5 h-3.5 ${isLocating ? "animate-spin text-amber-400" : isLiveLocation ? "text-emerald-400" : "text-sky-300"}`} />
-              <span className="hidden sm:inline">
-                {isLiveLocation ? t.liveLocation : t.myLocation}
-              </span>
-            </button>
+          {/* Action Controls - Hidden when search is focused ("side wale icon garab") */}
+          {!isSearchFocused && (
+            <div className="flex items-center gap-1.5 shrink-0 transition-opacity">
+              {/* Live Location Button */}
+              <button
+                id="live-gps-btn"
+                onClick={handleRequestLocation}
+                disabled={isLocating}
+                className={`px-3 py-1.5 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 shadow-sm ${
+                  isLiveLocation
+                    ? "bg-emerald-400/20 text-emerald-300 border-emerald-400/40"
+                    : "bg-white/[0.08] hover:bg-white/[0.14] text-white/85 hover:text-white border-white/15"
+                }`}
+                title="Use current GPS location"
+              >
+                <LocateFixed className={`w-3.5 h-3.5 ${isLocating ? "animate-spin text-amber-400" : isLiveLocation ? "text-emerald-400" : "text-sky-300"}`} />
+                <span className="hidden sm:inline">
+                  {isLiveLocation ? t.liveLocation : t.myLocation}
+                </span>
+              </button>
 
-            {/* Blue Sky Theme Toggle */}
-            <button
-              id="sky-theme-toggle"
-              onClick={() => setSkyTheme((themeVal) => (themeVal === "blue-sky" ? "deep-indigo" : "blue-sky"))}
-              className={`px-2.5 py-1.5 rounded-xl border text-xs font-semibold flex items-center gap-1 transition-all active:scale-95 shadow-sm ${
-                isBlueSky
-                  ? "bg-sky-400/20 text-sky-200 border-sky-400/40"
-                  : "bg-white/[0.08] hover:bg-white/[0.14] text-white/80 border-white/15"
-              }`}
-              title="Toggle Theme"
-            >
-              {isBlueSky ? (
-                <>
-                  <Sun className="w-3.5 h-3.5 text-amber-300" />
-                  <span className="hidden md:inline">{t.blueSky}</span>
-                </>
-              ) : (
-                <>
-                  <Moon className="w-3.5 h-3.5 text-indigo-300" />
-                  <span className="hidden md:inline">{t.midnight}</span>
-                </>
-              )}
-            </button>
+              {/* Blue Sky Theme Toggle */}
+              <button
+                id="sky-theme-toggle"
+                onClick={() => setSkyTheme((themeVal) => (themeVal === "blue-sky" ? "deep-indigo" : "blue-sky"))}
+                className={`px-2.5 py-1.5 rounded-xl border text-xs font-semibold flex items-center gap-1 transition-all active:scale-95 shadow-sm ${
+                  isBlueSky
+                    ? "bg-sky-400/20 text-sky-200 border-sky-400/40"
+                    : "bg-white/[0.08] hover:bg-white/[0.14] text-white/80 border-white/15"
+                }`}
+                title="Toggle Theme"
+              >
+                {isBlueSky ? (
+                  <>
+                    <Sun className="w-3.5 h-3.5 text-amber-300" />
+                    <span className="hidden md:inline">{t.blueSky}</span>
+                  </>
+                ) : (
+                  <>
+                    <Moon className="w-3.5 h-3.5 text-indigo-300" />
+                    <span className="hidden md:inline">{t.midnight}</span>
+                  </>
+                )}
+              </button>
 
-            {/* Unit Toggle */}
-            <button
-              id="temp-unit-toggle"
-              onClick={() => setUnit((u) => (u === "C" ? "F" : "C"))}
-              className="px-2.5 py-1.5 rounded-xl bg-white/[0.08] hover:bg-white/[0.14] active:scale-95 border border-white/15 text-xs font-bold text-amber-300 transition-all shadow-sm"
-              title="Toggle Celsius / Fahrenheit"
-            >
-              °{unit}
-            </button>
+              {/* Unit Toggle */}
+              <button
+                id="temp-unit-toggle"
+                onClick={() => setUnit((u) => (u === "C" ? "F" : "C"))}
+                className="px-2.5 py-1.5 rounded-xl bg-white/[0.08] hover:bg-white/[0.14] active:scale-95 border border-white/15 text-xs font-bold text-amber-300 transition-all shadow-sm"
+                title="Toggle Celsius / Fahrenheit"
+              >
+                °{unit}
+              </button>
 
-            {/* Refresh */}
-            <button
-              id="refresh-weather-btn"
-              onClick={handleRefresh}
-              disabled={isRefreshing}
-              className="p-2 rounded-xl bg-white/[0.08] hover:bg-white/[0.14] active:scale-95 border border-white/15 text-white/80 hover:text-white transition-all shadow-sm"
-              title={t.refresh}
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin text-amber-400" : ""}`} />
-            </button>
+              {/* Refresh */}
+              <button
+                id="refresh-weather-btn"
+                onClick={handleRefresh}
+                disabled={isRefreshing}
+                className="p-2 rounded-xl bg-white/[0.08] hover:bg-white/[0.14] active:scale-95 border border-white/15 text-white/80 hover:text-white transition-all shadow-sm"
+                title={t.refresh}
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin text-amber-400" : ""}`} />
+              </button>
 
-            {/* Settings Button */}
-            <button
-              id="app-settings-btn"
-              onClick={() => setIsSettingsOpen(true)}
-              className="p-2 rounded-xl bg-white/[0.08] hover:bg-white/[0.14] active:scale-95 border border-white/15 text-white/80 hover:text-amber-300 transition-all shadow-sm"
-              title={t.settings}
-            >
-              <SettingsIcon className="w-3.5 h-3.5 text-sky-300" />
-            </button>
+              {/* Settings Button */}
+              <button
+                id="app-settings-btn"
+                onClick={() => setIsSettingsOpen(true)}
+                className="p-2 rounded-xl bg-white/[0.08] hover:bg-white/[0.14] active:scale-95 border border-white/15 text-white/80 hover:text-amber-300 transition-all shadow-sm"
+                title={t.settings}
+              >
+                <SettingsIcon className="w-3.5 h-3.5 text-sky-300" />
+              </button>
 
-            <PWAInstallButton variant="header" />
-          </div>
+              <PWAInstallButton variant="header" />
+            </div>
+          )}
         </div>
       </header>
 
-      {/* Main App Content Viewport */}
-      <main className="max-w-4xl mx-auto px-4 py-4 pb-28 space-y-4">
+      {/* Search Focus Backdrop - Blurs and darkens everything behind search */}
+      <AnimatePresence>
+        {isSearchFocused && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            onClick={() => {
+              setIsSearchFocused(false);
+              setShowSuggestions(false);
+            }}
+            className="fixed inset-0 z-30 bg-black/80 backdrop-blur-md"
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Main App Content Viewport - Blurs when search is focused */}
+      <main className={`max-w-4xl mx-auto px-4 py-4 pb-28 space-y-4 transition-all duration-300 ${
+        isSearchFocused ? "filter blur-md opacity-25 pointer-events-none select-none" : ""
+      }`}>
         {/* Gentle Location Access Tip (shows smoothly only if user tapped My Location and browser blocked it) */}
         <AnimatePresence>
           {showPermissionTip && (
@@ -505,11 +853,14 @@ export default function App() {
                 {/* Quick Indian Metros Bar */}
                 <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
                   {INDIAN_METROS.map((metro) => {
-                    const isSelected = !isLiveLocation && weather.location.name.toLowerCase() === metro.name.toLowerCase();
+                    const isSelected = !isLiveLocation && (
+                      (customDisplayName && customDisplayName.toLowerCase().includes(metro.name.toLowerCase())) ||
+                      weather.location.name.toLowerCase().includes(metro.name.toLowerCase())
+                    );
                     return (
                       <button
                         key={metro.name}
-                        onClick={() => fetchWeather(metro.query, false)}
+                        onClick={() => fetchWeather(metro.query, false, metro.name)}
                         className={`px-3.5 py-1.5 rounded-xl text-xs font-medium whitespace-nowrap transition-all active:scale-95 border ${
                           isSelected
                             ? "bg-amber-400/25 text-amber-300 border-amber-400/50 shadow-[0_0_12px_rgba(251,191,36,0.2)] font-semibold"
@@ -529,7 +880,7 @@ export default function App() {
                     <div className="flex items-center gap-2 min-w-0">
                       <MapPin className="w-4 h-4 text-amber-400 shrink-0" />
                       <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white truncate">
-                        {weather.location.name}
+                        {customDisplayName || weather.location.name}
                       </h1>
                       <span className="text-xs text-sky-200/60 truncate hidden sm:inline">
                         {weather.location.region ? `${weather.location.region}, ` : ''}{weather.location.country}
